@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (C) 2022 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2022-2023 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -171,7 +171,8 @@ namespace Tensile
                 enqueuesByFlops       = CeilDivide(m_minFlopsPerSync, flopsInProblem);
             }
 
-            return std::min<size_t>(std::max<size_t>(m_numEnqueuesPerSync, enqueuesByFlops), m_maxEnqueuesPerSync);
+            return std::min<size_t>(std::max<size_t>(m_numEnqueuesPerSync, enqueuesByFlops),
+                                    m_maxEnqueuesPerSync);
         }
 
         void BenchmarkTimer::setNumEnqueuesPerSync(size_t count)
@@ -179,22 +180,34 @@ namespace Tensile
             m_curNumEnqueuesPerSync = count;
         }
 
-        void BenchmarkTimer::preEnqueues()
+        void BenchmarkTimer::preEnqueues(hipStream_t const& stream)
         {
             if(!m_useGPUTimer)
             {
                 HIP_CHECK_EXC(hipDeviceSynchronize());
                 m_startTime = clock::now();
             }
+            else
+            {
+                hipEventCreate(&start);
+                hipEventCreate(&stop);
+                hipEventRecord(start, stream);
+            }
         }
 
         void BenchmarkTimer::postEnqueues(TimingEvents const& startEvents,
-                                          TimingEvents const& stopEvents)
+                                          TimingEvents const& stopEvents,
+                                          hipStream_t const&  stream)
         {
             if(!m_useGPUTimer)
             {
                 HIP_CHECK_EXC(hipDeviceSynchronize());
                 m_endTime = clock::now();
+            }
+            else
+            {
+                hipEventRecord(stop, stream);
+                hipEventSynchronize(stop);
             }
         }
 
@@ -206,15 +219,25 @@ namespace Tensile
 
             if(m_useGPUTimer)
             {
-                HIP_CHECK_EXC(hipEventSynchronize(stopEvents->back().back()));
-                for(size_t i = 0; i < startEvents->size(); i++)
+                if((start == nullptr) && (stop == nullptr))
                 {
                     float enqTime = 0.0f;
+                    HIP_CHECK_EXC(hipEventSynchronize(stopEvents->back().back()));
+                    for(size_t i = 0; i < startEvents->size(); i++)
+                    {
+                        HIP_CHECK_EXC(hipEventElapsedTime(
+                            &enqTime, startEvents->at(i).front(), stopEvents->at(i).back()));
 
-                    HIP_CHECK_EXC(hipEventElapsedTime(
-                        &enqTime, startEvents->at(i).front(), stopEvents->at(i).back()));
-
-                    totalTime += double_millis(enqTime);
+                        totalTime += double_millis(enqTime);
+                    }
+                }
+                else
+                {
+                    float eventMs = 0.0f;
+                    hipEventElapsedTime(&eventMs, start, stop);
+                    totalTime = double_millis(eventMs);
+                    hipEventDestroy(start);
+                    hipEventDestroy(stop);
                 }
             }
             else

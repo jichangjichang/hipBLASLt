@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (C) 2022 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2022-2023 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -54,7 +54,8 @@ namespace Tensile
             virtual void postBenchmarkRun() override;
 
             virtual void preProblem(ContractionProblem const& problem) override;
-            virtual void preProblemGroupedGemm(std::vector<ContractionProblem> const& problems) override;
+            virtual void
+                preProblemGroupedGemm(std::vector<ContractionProblem> const& problems) override;
             virtual void postProblem() override;
 
             virtual void preSolution(ContractionSolution const& solution) override;
@@ -83,9 +84,10 @@ namespace Tensile
                 return 0;
             }
             virtual void setNumEnqueuesPerSync(size_t count) override {}
-            virtual void preEnqueues() override {}
+            virtual void preEnqueues(hipStream_t const& stream) override {}
             virtual void postEnqueues(TimingEvents const& startEvents,
-                                      TimingEvents const& stopEvents) override
+                                      TimingEvents const& stopEvents,
+                                      hipStream_t const&  stream) override
             {
             }
             virtual void validateEnqueues(std::shared_ptr<ContractionInputs> inputs,
@@ -126,9 +128,9 @@ namespace Tensile
             size_t                   m_cpuResultBufferSize = 0;
             std::shared_ptr<uint8_t> m_cpuResultBuffer;
 
-            ContractionProblem m_problem;
+            ContractionProblem              m_problem;
             std::vector<ContractionProblem> m_problems;
-            bool m_groupedGemm = false;
+            bool                            m_groupedGemm = false;
 
             bool m_enabled;
 
@@ -146,10 +148,10 @@ namespace Tensile
 
             int m_numBenchmarkRuns = 0;
 
-            bool   m_validatedSolution               = false;
-            bool   m_errorInSolution                 = false;
-            bool   m_error                           = false;
-            size_t m_errorsReported                  = 0;
+            bool   m_validatedSolution = false;
+            bool   m_errorInSolution   = false;
+            bool   m_error             = false;
+            size_t m_errorsReported    = 0;
 
             bool validateSolution(std::shared_ptr<ContractionInputs> inputs);
         };

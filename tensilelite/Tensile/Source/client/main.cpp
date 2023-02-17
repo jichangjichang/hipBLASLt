@@ -550,7 +550,7 @@ int main(int argc, const char* argv[])
 
                 reporters->report(ResultKey::ProblemIndex, problemIdx);
                 reporters->report(ResultKey::ProblemProgress,
-                                concatenate(problemIdx, "/", lastProblemIdx));
+                                  concatenate(problemIdx, "/", lastProblemIdx));
 
                 listeners.preProblem(problem);
                 solutionIterator->preProblemGroupedGemm(problems);
@@ -572,7 +572,8 @@ int main(int argc, const char* argv[])
                             {
                                 auto inputs = dataInit->prepareGPUInputs(problem);
 
-                                auto kernels = solution->solveGroupedGemm(problems, *inputs, *hardware);
+                                auto kernels
+                                    = solution->solveGroupedGemm(problems, *inputs, *hardware);
 
                                 size_t       warmupInvocations = listeners.numWarmupRuns();
                                 size_t       eventCount        = gpuTimer ? kernels.size() : 0;
@@ -588,8 +589,8 @@ int main(int argc, const char* argv[])
                                                                             warmupStartEvents[i],
                                                                             warmupStopEvents[i]));
                                     else
-                                        HIP_CHECK_EXC(
-                                            adapter.launchKernels(kernels, stream, nullptr, nullptr));
+                                        HIP_CHECK_EXC(adapter.launchKernels(
+                                            kernels, stream, nullptr, nullptr));
                                     listeners.postWarmup();
                                     // Do validation after first warmup
                                     if(i == 0)
@@ -607,19 +608,15 @@ int main(int argc, const char* argv[])
                                     TimingEvents startEvents(enq, eventCount);
                                     TimingEvents stopEvents(enq, eventCount);
 
-                                    listeners.preEnqueues();
+                                    listeners.preEnqueues(stream);
 
                                     for(int j = 0; j < enq; j++)
                                     {
-                                        if(gpuTimer)
-                                            HIP_CHECK_EXC(adapter.launchKernels(
-                                                kernels, stream, startEvents[j], stopEvents[j]));
-                                        else
-                                            HIP_CHECK_EXC(adapter.launchKernels(
-                                                kernels, stream, nullptr, nullptr));
+                                        HIP_CHECK_EXC(adapter.launchKernels(
+                                            kernels, stream, nullptr, nullptr));
                                     }
 
-                                    listeners.postEnqueues(startEvents, stopEvents);
+                                    listeners.postEnqueues(startEvents, stopEvents, stream);
                                     listeners.validateEnqueues(inputs, startEvents, stopEvents);
                                 }
 
@@ -630,7 +627,7 @@ int main(int argc, const char* argv[])
                         {
                             reporters->report(ResultKey::Validation, "INVALID");
                             reporters->log(LogLevel::Error,
-                                        concatenate("Exception occurred: ", err.what(), "\n"));
+                                           concatenate("Exception occurred: ", err.what(), "\n"));
                         }
                     }
 
@@ -655,7 +652,7 @@ int main(int argc, const char* argv[])
 
                 reporters->report(ResultKey::ProblemIndex, problemIdx);
                 reporters->report(ResultKey::ProblemProgress,
-                                concatenate(problemIdx, "/", lastProblemIdx));
+                                  concatenate(problemIdx, "/", lastProblemIdx));
 
                 // std::cout << "Problem: " << problem.operationDescription() <<
                 // std::endl; std::cout << "a: " << problem.a() << std::endl; std::cout <<
@@ -696,8 +693,8 @@ int main(int argc, const char* argv[])
                                                                             warmupStartEvents[i],
                                                                             warmupStopEvents[i]));
                                     else
-                                        HIP_CHECK_EXC(
-                                            adapter.launchKernels(kernels, stream, nullptr, nullptr));
+                                        HIP_CHECK_EXC(adapter.launchKernels(
+                                            kernels, stream, nullptr, nullptr));
                                     listeners.postWarmup();
                                     // Do validation after first warmup
                                     if(i == 0)
@@ -715,19 +712,15 @@ int main(int argc, const char* argv[])
                                     TimingEvents startEvents(enq, eventCount);
                                     TimingEvents stopEvents(enq, eventCount);
 
-                                    listeners.preEnqueues();
+                                    listeners.preEnqueues(stream);
 
                                     for(int j = 0; j < enq; j++)
                                     {
-                                        if(gpuTimer)
-                                            HIP_CHECK_EXC(adapter.launchKernels(
-                                                kernels, stream, startEvents[j], stopEvents[j]));
-                                        else
-                                            HIP_CHECK_EXC(adapter.launchKernels(
-                                                kernels, stream, nullptr, nullptr));
+                                        HIP_CHECK_EXC(adapter.launchKernels(
+                                            kernels, stream, nullptr, nullptr));
                                     }
 
-                                    listeners.postEnqueues(startEvents, stopEvents);
+                                    listeners.postEnqueues(startEvents, stopEvents, stream);
                                     listeners.validateEnqueues(inputs, startEvents, stopEvents);
                                 }
 
@@ -738,7 +731,7 @@ int main(int argc, const char* argv[])
                         {
                             reporters->report(ResultKey::Validation, "INVALID");
                             reporters->log(LogLevel::Error,
-                                        concatenate("Exception occurred: ", err.what(), "\n"));
+                                           concatenate("Exception occurred: ", err.what(), "\n"));
                         }
                     }
 

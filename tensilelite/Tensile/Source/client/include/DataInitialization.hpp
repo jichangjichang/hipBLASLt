@@ -474,9 +474,10 @@ namespace Tensile
                 return 0;
             };
             virtual void setNumEnqueuesPerSync(size_t count) override{};
-            virtual void preEnqueues() override{};
+            virtual void preEnqueues(hipStream_t const& stream) override{};
             virtual void postEnqueues(TimingEvents const& startEvents,
-                                      TimingEvents const& stopEvents) override{};
+                                      TimingEvents const& stopEvents,
+                                      hipStream_t const&  stream) override{};
             virtual void validateEnqueues(std::shared_ptr<ContractionInputs> inputs,
                                           TimingEvents const&                startEvents,
                                           TimingEvents const&                stopEvents) override{};
@@ -506,12 +507,12 @@ namespace Tensile
             size_t m_scaleMaxElements;
             size_t m_maxBatch;
 
-            std::vector<size_t> m_aElementsGroupedGemm;
-            std::vector<size_t> m_bElementsGroupedGemm;
-            std::vector<size_t> m_cElementsGroupedGemm;
-            std::vector<size_t> m_dElementsGroupedGemm;
-            std::vector<size_t> m_biasElementsGroupedGemm;
-            std::vector<size_t> m_scaleElementsGroupedGemm;
+            std::vector<size_t>   m_aElementsGroupedGemm;
+            std::vector<size_t>   m_bElementsGroupedGemm;
+            std::vector<size_t>   m_cElementsGroupedGemm;
+            std::vector<size_t>   m_dElementsGroupedGemm;
+            std::vector<size_t>   m_biasElementsGroupedGemm;
+            std::vector<size_t>   m_scaleElementsGroupedGemm;
             std::vector<DataType> m_biasTypeGroupedGemm;
 
             size_t m_workspaceSize;

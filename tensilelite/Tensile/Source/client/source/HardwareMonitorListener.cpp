@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (C) 2022 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2022-2023 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -56,14 +56,15 @@ namespace Tensile
             m_monitor->addFanSpeedMonitor();
         }
 
-        void HardwareMonitorListener::preEnqueues()
+        void HardwareMonitorListener::preEnqueues(hipStream_t const& stream)
         {
             if(m_active && !m_useGPUTimer)
                 m_monitor->start();
         }
 
         void HardwareMonitorListener::postEnqueues(TimingEvents const& startEvents,
-                                                   TimingEvents const& stopEvents)
+                                                   TimingEvents const& stopEvents,
+                                                   hipStream_t const&  stream)
         {
             if(!m_active)
                 return;

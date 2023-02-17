@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (C) 2022 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2022-2023 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -199,17 +199,18 @@ namespace Tensile
                 (*iter)->setNumEnqueuesPerSync(count);
         }
 
-        void MetaRunListener::preEnqueues()
+        void MetaRunListener::preEnqueues(hipStream_t const& stream)
         {
             for(auto iter = m_listeners.begin(); iter != m_listeners.end(); iter++)
-                (*iter)->preEnqueues();
+                (*iter)->preEnqueues(stream);
         }
 
         void MetaRunListener::postEnqueues(TimingEvents const& startEvents,
-                                           TimingEvents const& stopEvents)
+                                           TimingEvents const& stopEvents,
+                                           hipStream_t const&  stream)
         {
             for(auto iter = m_listeners.rbegin(); iter != m_listeners.rend(); iter++)
-                (*iter)->postEnqueues(startEvents, stopEvents);
+                (*iter)->postEnqueues(startEvents, stopEvents, stream);
         }
 
         void MetaRunListener::validateEnqueues(std::shared_ptr<ContractionInputs> inputs,
