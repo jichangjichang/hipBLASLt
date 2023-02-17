@@ -63,7 +63,6 @@ class MatrixInfo:
   startVgprValu: int             = -1
 
   numSgprStrides: int            = -1
-  numSgprOffset: int             = -1
 
 @dataclass
 class ABMatrixInfo(MatrixInfo):
@@ -3209,10 +3208,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.b.numSgprStrides -= 1
     self.states.numSgprSizesSum = kernel["ProblemType"]["NumIndicesSummation"]
     self.states.numSgprSizesFree = kernel["ProblemType"]["NumIndicesC"]
-    self.states.d.numSgprOffset = 1
-    self.states.c.numSgprOffset = 1
-    self.states.a.numSgprOffset = 1
-    self.states.b.numSgprOffset = 1
     self.states.numActivationTypeArgSize = 0 # Will change to 1 if activationType == All
     self.states.numActivationArgSize = max(1, int(kernel["ProblemType"]["DestDataType"].numRegisters()))
     self.states.numactivationArgTotalSize = self.states.numActivationArgSize * kernel["ProblemType"]["ActivationType"].getAdditionalArgNum()
@@ -3347,11 +3342,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.defineSgpr("WgmRemainder1", 1) # Magic number to use for div by (NumWorkGroups1 % WGM)
     self.defineSgpr("MagicNumberWgmRemainder1", 1) # Magic number to use for div by (NumWorkGroups1 % WGM)
 
-    self.defineSgpr("OffsetD", self.states.d.numSgprOffset)
-    self.defineSgpr("OffsetC", self.states.c.numSgprOffset)
-    self.defineSgpr("OffsetA", self.states.a.numSgprOffset)
-    self.defineSgpr("OffsetB", self.states.b.numSgprOffset)
-
     if kernel["ProblemType"]["GroupedGemm"]:
       self.defineSgpr("SmallMagicNumberDivWg0", 1)
       self.defineSgpr("SmallMagicNumberDivWg01", 1)
@@ -3363,7 +3353,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
       1 + \
       2 + \
       3 + \
-      self.states.d.numSgprOffset + self.states.c.numSgprOffset + self.states.a.numSgprOffset + self.states.b.numSgprOffset + \
       (2 if kernel["ProblemType"]["GroupedGemm"] else 0)
     # Get kernel argument end here
     ###################################

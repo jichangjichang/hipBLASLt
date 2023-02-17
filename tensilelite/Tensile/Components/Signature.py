@@ -120,11 +120,6 @@ class SignatureCOV3(Signature):
         signature.addArg(                "WgmRemainder1", SVK.SIG_VALUE,              "u32")
         signature.addArg(     "MagicNumberWgmRemainder1", SVK.SIG_VALUE,              "u32")
 
-        signature.addArg(                      "OffsetD", SVK.SIG_VALUE,              "u32")
-        signature.addArg(                      "OffsetC", SVK.SIG_VALUE,              "u32")
-        signature.addArg(                      "OffsetA", SVK.SIG_VALUE,              "u32")
-        signature.addArg(                      "OffsetB", SVK.SIG_VALUE,              "u32")
-
         if kernel["ProblemType"]["UseBias"] and (kernel["GlobalSplitU"] == 1):
             signature.addArg("bias", SVK.SIG_GLOBALBUFFER, biasValueType, "generic")
 

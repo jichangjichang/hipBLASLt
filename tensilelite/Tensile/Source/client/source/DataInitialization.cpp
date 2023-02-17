@@ -358,10 +358,6 @@ namespace Tensile
             , m_scaleDInit(args["init-scaleD"].as<InitMode>())
             , m_activationType(ActivationType::None)
             , m_activationHPA(false)
-            , m_aBufferOffset(args["offset-a"].as<size_t>())
-            , m_bBufferOffset(args["offset-b"].as<size_t>())
-            , m_cBufferOffset(args["offset-c"].as<size_t>())
-            , m_dBufferOffset(args["offset-d"].as<size_t>())
             , m_aMaxElements(0)
             , m_bMaxElements(0)
             , m_cMaxElements(0)
@@ -391,10 +387,10 @@ namespace Tensile
             {
                 if(m_groupedGemm)
                 {
-                    m_aMaxElements    += problem.a().totalAllocatedElements();
-                    m_bMaxElements    += problem.b().totalAllocatedElements();
-                    m_cMaxElements    += problem.c().totalAllocatedElements();
-                    m_dMaxElements    += problem.d().totalAllocatedElements();
+                    m_aMaxElements += problem.a().totalAllocatedElements();
+                    m_bMaxElements += problem.b().totalAllocatedElements();
+                    m_cMaxElements += problem.c().totalAllocatedElements();
+                    m_dMaxElements += problem.d().totalAllocatedElements();
                     m_biasMaxElements += problem.d().sizes()[0];
                     m_scaleMaxElements += problem.d().sizes()[0];
 
@@ -413,11 +409,11 @@ namespace Tensile
                 }
                 else
                 {
-                    m_aMaxElements    = std::max(m_aMaxElements, problem.a().totalAllocatedElements());
-                    m_bMaxElements    = std::max(m_bMaxElements, problem.b().totalAllocatedElements());
-                    m_cMaxElements    = std::max(m_cMaxElements, problem.c().totalAllocatedElements());
-                    m_dMaxElements    = std::max(m_dMaxElements, problem.d().totalAllocatedElements());
-                    m_biasMaxElements = std::max(m_biasMaxElements, problem.d().sizes()[0]);
+                    m_aMaxElements = std::max(m_aMaxElements, problem.a().totalAllocatedElements());
+                    m_bMaxElements = std::max(m_bMaxElements, problem.b().totalAllocatedElements());
+                    m_cMaxElements = std::max(m_cMaxElements, problem.c().totalAllocatedElements());
+                    m_dMaxElements = std::max(m_dMaxElements, problem.d().totalAllocatedElements());
+                    m_biasMaxElements  = std::max(m_biasMaxElements, problem.d().sizes()[0]);
                     m_scaleMaxElements = std::max(m_scaleMaxElements, problem.d().sizes()[0]);
 
                     size_t numOfBatch = 1;
@@ -426,11 +422,6 @@ namespace Tensile
                     m_maxBatch = std::max(m_maxBatch, numOfBatch);
                 }
             }
-
-            m_aMaxElements += m_aBufferOffset;
-            m_bMaxElements += m_bBufferOffset;
-            m_cMaxElements += m_cBufferOffset;
-            m_dMaxElements += m_dBufferOffset;
 
             if(m_curBoundsCheck == BoundsCheckMode::NaN)
             {

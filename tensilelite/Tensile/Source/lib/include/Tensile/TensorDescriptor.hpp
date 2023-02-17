@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (C) 2022 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2022-2023 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -117,46 +117,36 @@ namespace Tensile
         }
 
         template <typename IterA, typename IterB>
-        TensorDescriptor(DataType t,
-                         IterA    sizesBegin,
-                         IterA    sizesEnd,
-                         IterB    stridesBegin,
-                         IterB    stridesEnd,
-                         size_t   offset = 0)
+        TensorDescriptor(
+            DataType t, IterA sizesBegin, IterA sizesEnd, IterB stridesBegin, IterB stridesEnd)
             : m_sizes(sizesBegin, sizesEnd)
             , m_strides(stridesBegin, stridesEnd)
             , m_dataType(t)
-            , m_offset(offset)
         {
             this->calculate();
         }
 
         template <typename Iter>
-        TensorDescriptor(DataType t, Iter sizesBegin, Iter sizesEnd, size_t offset = 0)
+        TensorDescriptor(DataType t, Iter sizesBegin, Iter sizesEnd)
             : m_sizes(sizesBegin, sizesEnd)
             , m_dataType(t)
-            , m_offset(offset)
         {
             this->calculate();
         }
 
-        TensorDescriptor(DataType t, std::initializer_list<size_t> sizes, size_t offset = 0)
+        TensorDescriptor(DataType t, std::initializer_list<size_t> sizes)
             : m_sizes(sizes)
             , m_dataType(t)
-            , m_offset(offset)
-
         {
             this->calculate();
         }
 
         TensorDescriptor(DataType                      t,
                          std::initializer_list<size_t> sizes,
-                         std::initializer_list<size_t> strides,
-                         size_t                        offset = 0)
+                         std::initializer_list<size_t> strides)
             : m_sizes(sizes)
             , m_strides(strides)
             , m_dataType(t)
-            , m_offset(offset)
         {
             this->calculate();
         }
@@ -192,8 +182,6 @@ namespace Tensile
             for(int i = 0; i < m_sizes.size(); i++)
                 m_totalAllocatedElements += m_strides[i] * (m_sizes[i] - 1);
 
-            m_totalAllocatedElements += m_offset;
-
             if(Debug::Instance().printTensorInfo())
             {
                 std::cout << "TensorDescriptor:calculate  " << *this
@@ -210,12 +198,6 @@ namespace Tensile
         {
             return m_strides;
         }
-
-        size_t offset() const
-        {
-            return m_offset;
-        }
-
         bool empty() const
         {
             return m_sizes.empty();
@@ -284,7 +266,7 @@ namespace Tensile
                 if(indices[i] >= m_sizes[i])
                     throw std::runtime_error("Index out of bounds.");
 
-            return std::inner_product(indices.begin(), indices.end(), m_strides.begin(), m_offset);
+            return std::inner_product(indices.begin(), indices.end(), m_strides.begin(), 0);
         }
 
         template <typename T>
@@ -298,7 +280,7 @@ namespace Tensile
                 if(*i.first >= *i.second)
                     throw std::runtime_error("Index out of bounds.");
 
-            return std::inner_product(indices.begin(), indices.end(), m_strides.begin(), m_offset);
+            return std::inner_product(indices.begin(), indices.end(), m_strides.begin(), 0);
         }
 
         template <class... Ts,
@@ -332,7 +314,6 @@ namespace Tensile
     private:
         std::vector<size_t> m_sizes;
         std::vector<size_t> m_strides;
-        size_t              m_offset = 0;
 
         size_t m_totalLogicalElements   = 0;
         size_t m_totalAllocatedElements = 0;

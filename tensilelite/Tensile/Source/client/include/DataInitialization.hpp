@@ -494,11 +494,6 @@ namespace Tensile
             InitMode m_alphaInit, m_betaInit;
             InitMode m_biasInit, m_scaleDInit;
 
-            size_t m_aBufferOffset;
-            size_t m_bBufferOffset;
-            size_t m_cBufferOffset;
-            size_t m_dBufferOffset;
-
             size_t m_aMaxElements;
             size_t m_bMaxElements;
             size_t m_cMaxElements;

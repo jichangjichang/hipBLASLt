@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (C) 2022 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2022-2023 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -41,8 +41,7 @@ namespace Tensile
 
     bool TensorDescriptor::operator==(const TensorDescriptor& rhs) const
     {
-        return m_dataType == rhs.m_dataType && m_sizes == rhs.m_sizes && m_strides == rhs.m_strides
-               && m_offset == rhs.m_offset;
+        return m_dataType == rhs.m_dataType && m_sizes == rhs.m_sizes && m_strides == rhs.m_strides;
     }
 
     bool TensorDescriptor::operator!=(const TensorDescriptor& rhs) const
@@ -107,8 +106,6 @@ namespace Tensile
 
         result << "), strides(";
         streamJoin(result, m_strides, ", ");
-
-        result << "), offset(" << m_offset << "))";
 
         return result.str();
     }

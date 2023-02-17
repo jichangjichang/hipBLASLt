@@ -904,10 +904,6 @@ class KernelWriterAssembly(KernelWriter):
   ##############################################################################
   def defineAndResources(self, kernel, tPA, tPB):
     module = Module("allocateResources")
-    unsetD = self.undefineSgpr("OffsetD")
-    unsetC = self.undefineSgpr("OffsetC")
-    unsetA = self.undefineSgpr("OffsetA")
-    unsetB = self.undefineSgpr("OffsetB")
     self.defineVariableSgprs(kernel)
     module.add(self.macroAndSet(kernel, tPA, tPB))
 
@@ -1056,19 +1052,6 @@ class KernelWriterAssembly(KernelWriter):
     else:
       module.add(ValueIf(0))
 
-    # add offset to buffer
-    module.addComment1("add offset to buffer")
-    def addOffset2Buffer(imod, mat, value):
-      imod.add(SLShiftLeftB32(dst=sgpr("Offset%s"%mat), src=sgpr("Offset%s"%mat), shiftHex=hex(value), comment="elements offset to bytes offset"))
-      imod.add(SAddU32(dst=sgpr("Address%s+0"%mat), src0=sgpr("Address%s+0"%mat), src1=sgpr("Offset%s"%mat), comment="add offset to buffer address"))
-      imod.add(SAddCU32(dst=sgpr("Address%s+1"%mat), src0=sgpr("Address%s+1"%mat), src1=0, comment="add offset to buffer address"))
-
-    if not kernel["_GlobalAccumulation"]:
-      addOffset2Buffer(module, "D", log2(self.states.bpeCexternal))
-      addOffset2Buffer(module, "C", log2(self.states.bpeCexternal))
-    addOffset2Buffer(module, "A", log2(self.states.bpeAB))
-    addOffset2Buffer(module, "B", log2(self.states.bpeAB))
-
     # self.states.groOffsetInMacroTile == 1 case, subtract pre-pad here
     if self.states.groOffsetInMacroTile:
       prePad = self.states.srdShiftLeft["A"] * tPA["bpe"] # leave room in case we have to pointer shift
@@ -1077,13 +1060,6 @@ class KernelWriterAssembly(KernelWriter):
       prePad = self.states.srdShiftLeft["B"] * tPB["bpe"] # leave room in case we have to pointer shift
       module.add(SSubU32(dst=sgpr("AddressB+0"), src0=sgpr("AddressB+0"), src1=prePad, comment="pre-pad to make room for possible pointer shift"))
       module.add(SSubBU32(dst=sgpr("AddressB+1"), src0=sgpr("AddressB+1"), src1=0, comment="pre-pad to make room for possible pointer shift"))
-
-    # undefine Offset sgpr
-    module.addSpaceLine()
-    module.add(unsetD)
-    module.add(unsetC)
-    module.add(unsetA)
-    module.add(unsetB)
 
     # Check alpha == 0, is done before kernel body
     # so if alpha/beta=Half, they haven't been converted to f32

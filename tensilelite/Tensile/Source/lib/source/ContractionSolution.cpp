@@ -354,11 +354,11 @@ namespace Tensile
 
         uint64_t tensor2dSizeC = c.totalAllocatedElements();
         uint64_t tensor2dSizeA = (sizeMapping.packBatchDims & 0x1)
-                                        ? a.totalAllocatedElements()
-                                        : problem.allocatedElementsNonBatchA();
+                                     ? a.totalAllocatedElements()
+                                     : problem.allocatedElementsNonBatchA();
         uint64_t tensor2dSizeB = (sizeMapping.packBatchDims & 0x2)
-                                        ? b.totalAllocatedElements()
-                                        : problem.allocatedElementsNonBatchB();
+                                     ? b.totalAllocatedElements()
+                                     : problem.allocatedElementsNonBatchB();
 
         rv.args.append<uint64_t>("tensor2dSizeC", tensor2dSizeC);
         rv.args.append<uint64_t>("tensor2dSizeA", tensor2dSizeA);
@@ -472,14 +472,9 @@ namespace Tensile
         rv.args.append<uint32_t>("wgmRemainder1", wgmRemainder1);
         rv.args.append<uint32_t>("magicNumberWgmRemainder1", magicNumberWgmRemainder1);
 
-        rv.args.append<uint32_t>("offsetD", d.offset());
-        rv.args.append<uint32_t>("offsetC", c.offset());
-        rv.args.append<uint32_t>("offsetA", a.offset());
-        rv.args.append<uint32_t>("offsetB", b.offset());
-
         bool runActivation = false;
         if((problem.activationType() != ActivationType::None) && sizeMapping.activationFused
-            && (sizeMapping.globalSplitU == 1))
+           && (sizeMapping.globalSplitU == 1))
             runActivation = true;
         if(problemType.useBias && (sizeMapping.globalSplitU == 1))
         {
@@ -538,23 +533,23 @@ namespace Tensile
     }
 
     template <typename TypedInputs, bool T_Debug>
-    KernelInvocation
-        ContractionSolution::generateSingleCallGroupedGemm(std::vector<ContractionSolution::Problem> const& problems,
-                                                           TypedInputs const&                               inputs,
-                                                           Hardware const&                                  hardware) const
+    KernelInvocation ContractionSolution::generateSingleCallGroupedGemm(
+        std::vector<ContractionSolution::Problem> const& problems,
+        TypedInputs const&                               inputs,
+        Hardware const&                                  hardware) const
     {
         TENSILE_ASSERT_EXC(sizeMapping.workGroupMapping >= 0);
         KernelInvocation rv;
         rv.kernelName = kernelName;
-        rv.args = KernelArguments(T_Debug);
-        auto args = KernelArguments(T_Debug);
+        rv.args       = KernelArguments(T_Debug);
+        auto args     = KernelArguments(T_Debug);
         args.reserve(1024, 128);
         std::vector<uint32_t> wg_table;
-        uint32_t wgLeft = 0;
-        uint32_t wgRight = 0;
+        uint32_t              wgLeft  = 0;
+        uint32_t              wgRight = 0;
 
         rv.workGroupSize.x = sizeMapping.workGroupSize.x * sizeMapping.workGroupSize.y
-                            * sizeMapping.workGroupSize.z;
+                             * sizeMapping.workGroupSize.z;
         rv.workGroupSize.y = 1;
         rv.workGroupSize.z = 1;
 
@@ -599,11 +594,12 @@ namespace Tensile
             uint32_t problemNumGroupTiles0 = rv.numWorkGroups.x;
             uint32_t problemNumGroupTiles1 = rv.numWorkGroups.y;
 
-            rv.numWorkItems.x += (rv.workGroupSize.x * rv.numWorkGroups.x *\
-                                  rv.workGroupSize.y * rv.numWorkGroups.y * sizeMapping.globalSplitU *\
-                                  rv.workGroupSize.y * rv.numWorkGroups.z);
+            rv.numWorkItems.x += (rv.workGroupSize.x * rv.numWorkGroups.x * rv.workGroupSize.y
+                                  * rv.numWorkGroups.y * sizeMapping.globalSplitU
+                                  * rv.workGroupSize.y * rv.numWorkGroups.z);
 
-            wgRight = rv.numWorkItems.x / rv.workGroupSize.x / rv.workGroupSize.y / rv.workGroupSize.y;
+            wgRight
+                = rv.numWorkItems.x / rv.workGroupSize.x / rv.workGroupSize.y / rv.workGroupSize.y;
             wg_table.push_back(wgLeft);
             wgLeft = wgRight;
 
@@ -616,11 +612,11 @@ namespace Tensile
 
             uint64_t tensor2dSizeC = c.totalAllocatedElements();
             uint64_t tensor2dSizeA = (sizeMapping.packBatchDims & 0x1)
-                                            ? a.totalAllocatedElements()
-                                            : problem.allocatedElementsNonBatchA();
+                                         ? a.totalAllocatedElements()
+                                         : problem.allocatedElementsNonBatchA();
             uint64_t tensor2dSizeB = (sizeMapping.packBatchDims & 0x2)
-                                            ? b.totalAllocatedElements()
-                                            : problem.allocatedElementsNonBatchB();
+                                         ? b.totalAllocatedElements()
+                                         : problem.allocatedElementsNonBatchB();
 
             args.append<uint64_t>("tensor2dSizeC", tensor2dSizeC);
             args.append<uint64_t>("tensor2dSizeA", tensor2dSizeA);
@@ -653,7 +649,8 @@ namespace Tensile
 
             if(problemType.useScaleD && (sizeMapping.globalSplitU == 1)) //kernel input data
             {
-                args.append<typename TypedInputs::AlphaType const*>("scaleD", inputs.groupedScaleD[idx]);
+                args.append<typename TypedInputs::AlphaType const*>("scaleD",
+                                                                    inputs.groupedScaleD[idx]);
             }
 
             size_t startStrideCD = problemType.useInitialStridesCD ? 0 : 1;
@@ -721,17 +718,14 @@ namespace Tensile
             args.append<uint32_t>("wgmRemainder1", wgmRemainder1);
             args.append<uint32_t>("magicNumberWgmRemainder1", magicNumberWgmRemainder1);
 
-            args.append<uint32_t>("offsetD", d.offset());
-            args.append<uint32_t>("offsetC", c.offset());
-            args.append<uint32_t>("offsetA", a.offset());
-            args.append<uint32_t>("offsetB", b.offset());
-
-            args.append<uint32_t>("SmallMagicNumberDivWg0", smallMagicNumber(problemNumGroupTiles0));
-            args.append<uint32_t>("SmallMagicNumberDivWg01", smallMagicNumber(problemNumGroupTiles0 * problemNumGroupTiles1));
+            args.append<uint32_t>("SmallMagicNumberDivWg0",
+                                  smallMagicNumber(problemNumGroupTiles0));
+            args.append<uint32_t>("SmallMagicNumberDivWg01",
+                                  smallMagicNumber(problemNumGroupTiles0 * problemNumGroupTiles1));
 
             bool runActivation = false;
             if((problem.activationType() != ActivationType::None) && sizeMapping.activationFused
-                && (sizeMapping.globalSplitU == 1))
+               && (sizeMapping.globalSplitU == 1))
                 runActivation = true;
             if(problemType.useBias && (sizeMapping.globalSplitU == 1))
             {
@@ -756,14 +750,15 @@ namespace Tensile
                     {
                         args.append<typename TypedInputs::BetaType>(
                             name.c_str(),
-                            static_cast<typename TypedInputs::BetaType>(inputs.groupedActivationArgs[idx][i]));
+                            static_cast<typename TypedInputs::BetaType>(
+                                inputs.groupedActivationArgs[idx][i]));
                     }
                     else if(std::is_same<typename TypedInputs::DType, Half>::value)
                     {
-                        args.append<typename TypedInputs::DType>((name + "_pk").c_str(),
-                                                                    inputs.groupedActivationArgs[idx][i]);
-                        args.append<typename TypedInputs::DType>(name.c_str(),
-                                                                    inputs.groupedActivationArgs[idx][i]);
+                        args.append<typename TypedInputs::DType>(
+                            (name + "_pk").c_str(), inputs.groupedActivationArgs[idx][i]);
+                        args.append<typename TypedInputs::DType>(
+                            name.c_str(), inputs.groupedActivationArgs[idx][i]);
                     }
                     else
                     {
@@ -771,28 +766,32 @@ namespace Tensile
                         {
                             // BFloat16 to float32.
                             args.append<uint16_t>((name + "_append").c_str(),
-                                                    static_cast<uint16_t>(0));
+                                                  static_cast<uint16_t>(0));
                         }
-                        args.append<typename TypedInputs::DType>(name.c_str(),
-                                                                    inputs.groupedActivationArgs[idx][i]);
+                        args.append<typename TypedInputs::DType>(
+                            name.c_str(), inputs.groupedActivationArgs[idx][i]);
                     }
                 }
                 if(problem.activationType() == ActivationType::All)
                 {
                     args.append<uint32_t>("activationType",
-                                            static_cast<uint32_t>(problem.activationEnumArg()));
+                                          static_cast<uint32_t>(problem.activationEnumArg()));
                 }
             }
         }
 
         std::vector<uint8_t> h_args;
-        h_args.resize((args.size() * sizeof(uint8_t) + wg_table.size() * sizeof(uint32_t)) / sizeof(uint8_t));
+        h_args.resize((args.size() * sizeof(uint8_t) + wg_table.size() * sizeof(uint32_t))
+                      / sizeof(uint8_t));
         std::memcpy(&h_args[0], wg_table.data(), wg_table.size() * sizeof(uint32_t));
-        std::memcpy(&h_args[wg_table.size() * sizeof(uint32_t) / sizeof(uint8_t)], args.data(), args.size() * sizeof(uint8_t));
+        std::memcpy(&h_args[wg_table.size() * sizeof(uint32_t) / sizeof(uint8_t)],
+                    args.data(),
+                    args.size() * sizeof(uint8_t));
 
         rv.args.append<uint32_t>("numGemms", problems.size());
         uint8_t* d_args = (uint8_t*)(inputs.groupedWs[0]);
-        HIP_CHECK_EXC(hipMemcpy(d_args, h_args.data(), h_args.size() * sizeof(uint8_t), hipMemcpyHostToDevice));
+        HIP_CHECK_EXC(hipMemcpy(
+            d_args, h_args.data(), h_args.size() * sizeof(uint8_t), hipMemcpyHostToDevice));
         rv.args.append<uint8_t const*>("args", d_args);
         rv.codeObjectFile = codeObjectFilename.load();
 
@@ -885,9 +884,6 @@ namespace Tensile
             rv.args.append<uint32_t>(concatenate_if<T_Debug>("size_", idx), size);
             idx++;
         }
-
-        rv.args.append<uint32_t>("offsetD", d.offset());
-        rv.args.append<uint32_t>("offsetC", c.offset());
 
         rv.args.append<typename TypedInputs::BetaType>("beta", inputs.beta);
 
@@ -1042,9 +1038,6 @@ namespace Tensile
             idx++;
         }
 
-        rv.args.append<uint32_t>("offsetD", d.offset());
-        rv.args.append<uint32_t>("offsetC", c.offset());
-
         if(sizeMapping.globalAccumulation == 1)
             rv.args.append<uint32_t>("gsu", 1);
         else
@@ -1197,8 +1190,6 @@ namespace Tensile
             idx++;
         }
 
-        rv.args.append<uint32_t>("offsetD", d.offset());
-
         return rv;
     }
 
@@ -1320,48 +1311,52 @@ namespace Tensile
     }
 
     template <typename TypedInputs>
-    std::vector<KernelInvocation> ContractionSolution::solveTypedGroupedGemm(std::vector<Problem> const&     problems,
-                                                                             TypedInputs const& inputs,
-                                                                             Hardware const&    hardware) const
+    std::vector<KernelInvocation>
+        ContractionSolution::solveTypedGroupedGemm(std::vector<Problem> const& problems,
+                                                   TypedInputs const&          inputs,
+                                                   Hardware const&             hardware) const
     {
         bool debug = Debug::Instance().printKernelArguments() || this->kernelArgsLog;
 
         // Check for nullptrs if alpha is non-zero.
-        for(int idx = 0; idx < problems.size(); idx++){
+        for(int idx = 0; idx < problems.size(); idx++)
+        {
             int boundSize = 1;
             for(size_t i = 0; i < problems[idx].boundIndices().size(); i++)
                 boundSize *= problems[idx].boundSize(i);
 
-            if(((inputs.groupedAlpha[idx] != static_cast<typename TypedInputs::AlphaType>(0)) && (boundSize != 0))
-            && ((problems[idx].stridedBatched() && (inputs.groupedA[idx] == nullptr || inputs.groupedB[idx] == nullptr))))
+            if(((inputs.groupedAlpha[idx] != static_cast<typename TypedInputs::AlphaType>(0))
+                && (boundSize != 0))
+               && ((problems[idx].stridedBatched()
+                    && (inputs.groupedA[idx] == nullptr || inputs.groupedB[idx] == nullptr))))
             {
                 std::string matrixID = inputs.groupedA[idx] == nullptr ? "A" : "B";
                 std::string msg      = std::string("Unsupported nullptr for ") + matrixID
-                                + std::string(" when (Alpha !=0) && (K != 0)\n");
+                                  + std::string(" when (Alpha !=0) && (K != 0)\n");
                 throw std::runtime_error(msg.c_str());
             }
 
             // Check if alpha matches problem definition
             if(problems[idx].alphaRestriction() != ScalarValue::Any
-            && problems[idx].alphaRestriction() != toScalarValueEnum(inputs.groupedAlpha[idx]))
+               && problems[idx].alphaRestriction() != toScalarValueEnum(inputs.groupedAlpha[idx]))
             {
                 std::stringstream inputValue;
                 inputValue << inputs.groupedAlpha[idx];
                 std::string msg = std::string("Alpha value ") + inputValue.str()
-                                + std::string(" doesn't match that set in problem: ")
-                                + ToString(problems[idx].alphaRestriction());
+                                  + std::string(" doesn't match that set in problem: ")
+                                  + ToString(problems[idx].alphaRestriction());
                 throw std::runtime_error(msg.c_str());
             }
 
             // Check if beta matches problem definition
             if(problems[idx].betaRestriction() != ScalarValue::Any
-            && problems[idx].betaRestriction() != toScalarValueEnum(inputs.groupedBeta[idx]))
+               && problems[idx].betaRestriction() != toScalarValueEnum(inputs.groupedBeta[idx]))
             {
                 std::stringstream inputValue;
                 inputValue << inputs.groupedBeta[idx];
                 std::string msg = std::string("Beta value ") + inputValue.str()
-                                + std::string(" doesn't match that set in problem: ")
-                                + ToString(problems[idx].betaRestriction());
+                                  + std::string(" doesn't match that set in problem: ")
+                                  + ToString(problems[idx].betaRestriction());
                 throw std::runtime_error(msg.c_str());
             }
 
@@ -1381,9 +1376,11 @@ namespace Tensile
         // }
 
         if(debug)
-            rv.push_back(generateSingleCallGroupedGemm<TypedInputs, true>(problems, inputs, hardware));
+            rv.push_back(
+                generateSingleCallGroupedGemm<TypedInputs, true>(problems, inputs, hardware));
         else
-            rv.push_back(generateSingleCallGroupedGemm<TypedInputs, false>(problems, inputs, hardware));
+            rv.push_back(
+                generateSingleCallGroupedGemm<TypedInputs, false>(problems, inputs, hardware));
 
         // if(sizeMapping.globalAccumulation)
         // {
@@ -1535,10 +1532,10 @@ namespace Tensile
         throw std::runtime_error("Data type not implemented.");
     }
 
-    std::vector<KernelInvocation>
-        ContractionSolution::solveGroupedGemm(std::vector<ContractionSolution::Problem> const& problems,
-                                              ContractionSolution::Inputs const&  inputs,
-                                              Hardware const&                     hardware) const
+    std::vector<KernelInvocation> ContractionSolution::solveGroupedGemm(
+        std::vector<ContractionSolution::Problem> const& problems,
+        ContractionSolution::Inputs const&               inputs,
+        Hardware const&                                  hardware) const
     {
         if(Debug::Instance().printWinningKernelName())
             std::cout << "Running kernel: " << this->KernelName() << std::endl;
