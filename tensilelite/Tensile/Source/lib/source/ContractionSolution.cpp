@@ -352,7 +352,6 @@ namespace Tensile
 
         rv.sharedMemBytes = 0;
 
-        uint64_t tensor2dSizeC = c.totalAllocatedElements();
         uint64_t tensor2dSizeA = (sizeMapping.packBatchDims & 0x1)
                                      ? a.totalAllocatedElements()
                                      : problem.allocatedElementsNonBatchA();
@@ -360,7 +359,6 @@ namespace Tensile
                                      ? b.totalAllocatedElements()
                                      : problem.allocatedElementsNonBatchB();
 
-        rv.args.append<uint64_t>("tensor2dSizeC", tensor2dSizeC);
         rv.args.append<uint64_t>("tensor2dSizeA", tensor2dSizeA);
         rv.args.append<uint64_t>("tensor2dSizeB", tensor2dSizeB);
 

@@ -959,8 +959,6 @@ class KernelWriterAssembly(KernelWriter):
       if globalParameters["DebugKernel"]:
         moduleArgs.add(self.argLoader.loadKernArg("AddressDbg", "KernArgAddress", dword=2))
 
-      self.argLoader.loadKernArg("Tensor2dSizeC", "KernArgAddress", dword=2, writeSgpr=False)
-
       load = self.states.numSgprToLoad
       sgprStart = self.sgprs["Tensor2dSizeA"]
       moduleArgs.addModuleAsFlatItems(self.argLoader.loadAllKernArg(sgprStart, "KernArgAddress", load))
