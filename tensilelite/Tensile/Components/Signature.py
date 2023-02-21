@@ -115,9 +115,12 @@ class SignatureCOV3(Signature):
         signature.addArg(               "NumWorkGroups0", SVK.SIG_VALUE,              "u32")
         signature.addArg(               "NumWorkGroups1", SVK.SIG_VALUE,              "u32")
 
-        signature.addArg(                "NumFullBlocks", SVK.SIG_VALUE,              "u32")
-        signature.addArg(                "WgmRemainder1", SVK.SIG_VALUE,              "u32")
-        signature.addArg(     "MagicNumberWgmRemainder1", SVK.SIG_VALUE,              "u32")
+        if kernel["WorkGroupMapping"] > 1:
+            signature.addArg(                "NumFullBlocks", SVK.SIG_VALUE,              "u32")
+            signature.addArg(                "WgmRemainder1", SVK.SIG_VALUE,              "u32")
+            signature.addArg(     "MagicNumberWgmRemainder1", SVK.SIG_VALUE,              "u32")
+        else:
+            signature.addArg(                      "padding", SVK.SIG_VALUE,              "u32")
 
         if kernel["ProblemType"]["UseBias"] and (kernel["GlobalSplitU"] == 1):
             signature.addArg("bias", SVK.SIG_GLOBALBUFFER, biasValueType, "generic")

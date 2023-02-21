@@ -457,18 +457,19 @@ namespace Tensile
         uint32_t wgmRemainder1            = 0;
         uint32_t magicNumberWgmRemainder1 = 0;
 
-        if(sizeMapping.workGroupMapping != 0)
+        if(sizeMapping.workGroupMapping > 1)
         {
             numFullBlocks = problemNumGroupTiles1 / sizeMapping.workGroupMapping;
             wgmRemainder1 = problemNumGroupTiles1 % sizeMapping.workGroupMapping;
             if(wgmRemainder1 == 0)
                 wgmRemainder1 = sizeMapping.workGroupMapping;
             magicNumberWgmRemainder1 = smallMagicNumber(wgmRemainder1);
+            rv.args.append<uint32_t>("numFullBlocks", numFullBlocks);
+            rv.args.append<uint32_t>("wgmRemainder1", wgmRemainder1);
+            rv.args.append<uint32_t>("magicNumberWgmRemainder1", magicNumberWgmRemainder1);
         }
-
-        rv.args.append<uint32_t>("numFullBlocks", numFullBlocks);
-        rv.args.append<uint32_t>("wgmRemainder1", wgmRemainder1);
-        rv.args.append<uint32_t>("magicNumberWgmRemainder1", magicNumberWgmRemainder1);
+        else
+            rv.args.append<uint32_t>("pad0", 0);
 
         bool runActivation = false;
         if((problem.activationType() != ActivationType::None) && sizeMapping.activationFused
