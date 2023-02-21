@@ -958,7 +958,7 @@
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 3 #10
-    SolutionNameMin: Cijk_Ailk_Bljk_HHS_BH_MT128x16x64_MI16x16x16x1_SN_AF0EM8_GRVW4_GSU8_LPB4_LRVW4_MIWT2_1_NEPBS0_SS1_SU0_SUS0_SVW2_VW2_WG64_4_1_WGM2
+    SolutionNameMin: Cijk_Ailk_Bljk_HHS_BH_MT128x16x64_MI16x16x16x1_SN_AF0EM8_GRVW4_GSU8_LPB4_LRVW4_MIWT2_1_NEPBS0_SS1_SU0_SUS0_SVW2_VW2_WG64_4_1_WGM1
     SourceSwap: 1
     StaggerU: 0
     StaggerUMapping: 0
@@ -990,7 +990,7 @@
     WaveSeparateGlobalReadB: 1
     WavefrontSize: 64
     WorkGroup: [64, 4, 1]
-    WorkGroupMapping: 2
+    WorkGroupMapping: 1
     _DepthULds: 64
     _GlobalAccumulation: MultipleBuffer
     _UseSgprForGRO: 1
@@ -3749,7 +3749,7 @@
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 16 #18 #29
-    SolutionNameMin: Cijk_Ailk_Bljk_HHS_BH_MT64x16x64_MI16x16x16x1_SN_GRVW8_GSU1_LPB16_LRVW8_MIWT1_1_PLR5_SU0_SUS0_SVW4_VW8_WG64_4_1_WGM8
+    SolutionNameMin: Cijk_Ailk_Bljk_HHS_BH_MT64x16x64_MI16x16x16x1_SN_GRVW8_GSU1_LPB16_LRVW8_MIWT1_1_PLR5_SU0_SUS0_SVW4_VW8_WG64_4_1_WGM1
     SourceSwap: false
     StaggerU: 0
     StaggerUMapping: 0
@@ -3781,7 +3781,7 @@
     WaveSeparateGlobalReadB: 0
     WavefrontSize: 64
     WorkGroup: [64, 4, 1]
-    WorkGroupMapping: 8
+    WorkGroupMapping: 1
     _DepthULds: 64
     _GlobalAccumulation: null
     _UseSgprForGRO: 1
@@ -3964,7 +3964,7 @@
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 17 #19 #30
-    SolutionNameMin: Cijk_Ailk_Bljk_HHS_BH_MT64x16x64_MI16x16x16x1_SN_GRVW2_GSU8_LPB16_LRVW8_MIWT1_1_PLR5_SU0_SUS0_SVW4_VW4_WG64_4_1_WGM8
+    SolutionNameMin: Cijk_Ailk_Bljk_HHS_BH_MT64x16x64_MI16x16x16x1_SN_GRVW2_GSU8_LPB16_LRVW8_MIWT1_1_PLR5_SU0_SUS0_SVW4_VW4_WG64_4_1_WGM1
     SourceSwap: false
     StaggerU: 0
     StaggerUMapping: 0
@@ -3996,7 +3996,7 @@
     WaveSeparateGlobalReadB: 0
     WavefrontSize: 64
     WorkGroup: [64, 4, 1]
-    WorkGroupMapping: 8
+    WorkGroupMapping: 1
     _DepthULds: 64
     _GlobalAccumulation: MultipleBuffer
     _UseSgprForGRO: 1
