@@ -352,16 +352,6 @@ namespace Tensile
 
         rv.sharedMemBytes = 0;
 
-        uint64_t tensor2dSizeA = (sizeMapping.packBatchDims & 0x1)
-                                     ? a.totalAllocatedElements()
-                                     : problem.allocatedElementsNonBatchA();
-        uint64_t tensor2dSizeB = (sizeMapping.packBatchDims & 0x2)
-                                     ? b.totalAllocatedElements()
-                                     : problem.allocatedElementsNonBatchB();
-
-        rv.args.append<uint64_t>("tensor2dSizeA", tensor2dSizeA);
-        rv.args.append<uint64_t>("tensor2dSizeB", tensor2dSizeB);
-
         if(sizeMapping.globalAccumulation)
         {
             rv.args.append<void const*>("ws_d", inputs.ws);
@@ -608,18 +598,6 @@ namespace Tensile
             TensorDescriptor const& b = problem.b();
             TensorDescriptor const& c = problem.c();
             TensorDescriptor const& d = problem.d();
-
-            uint64_t tensor2dSizeC = c.totalAllocatedElements();
-            uint64_t tensor2dSizeA = (sizeMapping.packBatchDims & 0x1)
-                                         ? a.totalAllocatedElements()
-                                         : problem.allocatedElementsNonBatchA();
-            uint64_t tensor2dSizeB = (sizeMapping.packBatchDims & 0x2)
-                                         ? b.totalAllocatedElements()
-                                         : problem.allocatedElementsNonBatchB();
-
-            args.append<uint64_t>("tensor2dSizeC", tensor2dSizeC);
-            args.append<uint64_t>("tensor2dSizeA", tensor2dSizeA);
-            args.append<uint64_t>("tensor2dSizeB", tensor2dSizeB);
 
             if(sizeMapping.globalAccumulation)
             {

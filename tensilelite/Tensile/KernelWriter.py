@@ -3286,7 +3286,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.defineSgpr("SrdScaleD", 4, 4)# asm input interface
     ###################################
     # Get kernel argument start here
-    self.defineSgpr("Tensor2dSizeA", 2,4)
+    self.defineSgpr("AddressD", numSgprAddressD,4)
     # fill empty Sgpr slot caused by Sgpr alignment,
     # because we need following defineSgpr use continuous sgpr
     SgprSlot = []
@@ -3297,9 +3297,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         self.sgprPool.checkIn(tempSgpr)
         break
       SgprSlot.append(tempSgpr)
-    self.defineSgpr("Tensor2dSizeB", 2, 2)
 
-    self.defineSgpr("AddressD", numSgprAddressD)
     self.defineSgpr("AddressC", numSgprAddressC)
     self.defineSgpr("AddressA", numSgprAddressA)
     self.defineSgpr("AddressB", numSgprAddressB)
@@ -3347,7 +3345,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.defineSgpr("SmallMagicNumberDivWg0", 1)
       self.defineSgpr("SmallMagicNumberDivWg01", 1)
 
-    self.states.numSgprToLoad = 2 + 2 + numSgprAddressD + numSgprAddressC + numSgprAddressA + numSgprAddressB + numSgprAddressScaleD + numSgprAlpha + \
+    self.states.numSgprToLoad = numSgprAddressD + numSgprAddressC + numSgprAddressA + numSgprAddressB + numSgprAddressScaleD + numSgprAlpha + \
       (numSgprBeta if kernel["ProblemType"]["UseBeta"] else 0) + self.states.d.numSgprStrides + self.states.c.numSgprStrides + self.states.a.numSgprStrides + \
       self.states.b.numSgprStrides + self.states.numSgprSizesFree + self.states.numSgprSizesSum + \
       len(kernel["PackedC0IdxChars"][:-1])*2 + len(kernel["PackedC1IdxChars"][:-1])*2 + \

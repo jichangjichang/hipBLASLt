@@ -73,8 +73,6 @@ class SignatureCOV3(Signature):
 
         if globalParameters["DebugKernel"]:
             signature.addArg("AddressDbg", SVK.SIG_GLOBALBUFFER, "struct", "generic")
-        signature.addArg("sizeA",        SVK.SIG_VALUE,        "u64")
-        signature.addArg("sizeB",        SVK.SIG_VALUE,        "u64")
         signature.addArg(    "D", SVK.SIG_GLOBALBUFFER, dstValueType, "generic")
         signature.addArg(    "C", SVK.SIG_GLOBALBUFFER, dstValueType, "generic")
         signature.addArg(    "A", SVK.SIG_GLOBALBUFFER, srcValueType, "generic")

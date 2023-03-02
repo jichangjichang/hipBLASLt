@@ -364,7 +364,6 @@ class KernelWriterAssembly(KernelWriter):
       self.defineSgpr("SrdB", 4, 4)
 
     if self.states.use64bShadowLimit:
-      # If need more SGPR could overlap this with the Tensor2dSize regs
       self.defineSgpr("ShadowLimitA", 2, 2)
       self.defineSgpr("ShadowLimitB", 2, 2)
 
@@ -960,7 +959,7 @@ class KernelWriterAssembly(KernelWriter):
         moduleArgs.add(self.argLoader.loadKernArg("AddressDbg", "KernArgAddress", dword=2))
 
       load = self.states.numSgprToLoad
-      sgprStart = self.sgprs["Tensor2dSizeA"]
+      sgprStart = self.sgprs["AddressD"]
       moduleArgs.addModuleAsFlatItems(self.argLoader.loadAllKernArg(sgprStart, "KernArgAddress", load))
       if kernel.enabledSetPrioSplitLDS:
         moduleArgs.add(SSetPrior(prior=1, comment="prioritize init code so as to issue load sooner"))
@@ -1802,9 +1801,10 @@ class KernelWriterAssembly(KernelWriter):
   def computeLoadSrd(self, kernel, tP, tc, indices, bpe):
     module = Module("computeLoadSrd")
 
-    with self.allocTmpSgpr(2 + 2) as tmpSgprInfo:
+    with self.allocTmpSgpr(2 + 2 + 2) as tmpSgprInfo:
       stmp = tmpSgprInfo.idx
       tileStart = stmp+2
+      tensor2dSize = stmp+4
       wroteTileStart = False
       #---
       # Compute tileStart #elements from the 2D array start
@@ -1848,6 +1848,25 @@ class KernelWriterAssembly(KernelWriter):
       if not wroteTileStart:
         module.add(SMovB64(dst=sgpr(tileStart, 2), src=0, comment="set default tileStart"))
 
+      #Calculate tensor 2d size
+      module.add(SMovB32(dst=sgpr(tensor2dSize+0), src=0x1, comment="Init tensor size"))
+      module.add(SMovB32(dst=sgpr(tensor2dSize+1), src=0x0, comment="init tensor size"))
+
+      numDim = len(indices)
+      for i in range(0, numDim):
+        idx = indices[i]
+        if idx == kernel["ProblemType"]["Index0"] \
+            or idx == kernel["ProblemType"]["Index1"] \
+            or idx in kernel["ProblemType"]["IndicesSummation"] \
+            or isPackedIndex(kernel, idx):
+          stride = self.strideRef(tc,idx)
+          size =   self.sizeRef(idx)
+          module.add(SSubU32(dst=sgpr(stmp), src0=size, src1=0x1, comment="(size-1)"))
+          module.addModuleAsFlatItems(self.s_mul_u64_u32(sgpr(stmp), sgpr(stmp+1), stride, \
+                      sgpr(stmp), "stride x (size-1)"))
+          module.add(SAddU32(dst=sgpr(tensor2dSize+0), src0=sgpr(tensor2dSize+0), src1=sgpr(stmp+0), comment="sum tensor size"))
+          module.add(SAddCU32(dst=sgpr(tensor2dSize+1), src0=sgpr(tensor2dSize+1), src1=sgpr(stmp+1), comment="sum tensor size"))
+
       if self.states.use64bShadowLimit:
         limitTmp0 = "ShadowLimit%s+0"%tc
         limitTmp1 = "ShadowLimit%s+1"%tc
@@ -1855,8 +1874,8 @@ class KernelWriterAssembly(KernelWriter):
         limitTmp0 = stmp+0
         limitTmp1 = stmp+1
 
-      module.add(SSubU32(dst=sgpr(limitTmp0), src0=sgpr("Tensor2dSize%s"%tc), src1=sgpr(tileStart+0), comment="sub tileStart"))
-      module.add(SSubBU32(dst=sgpr(limitTmp1), src0=sgpr("Tensor2dSize%s+1"%tc), src1=sgpr(tileStart+1), comment="sub tileStart"))
+      module.add(SSubU32(dst=sgpr(limitTmp0), src0=sgpr(tensor2dSize+0), src1=sgpr(tileStart+0), comment="sub tileStart"))
+      module.add(SSubBU32(dst=sgpr(limitTmp1), src0=sgpr(tensor2dSize+1), src1=sgpr(tileStart+1), comment="sub tileStart"))
 
       if self.states.use64bShadowLimit:
         # Set initial buffer limit
@@ -1883,7 +1902,6 @@ class KernelWriterAssembly(KernelWriter):
 
       # Apply any high-order address components to the tileStart and eventually the SRD - batch idx for batched gemm
       if kernel["ProblemType"]["StridedBatched"]:
-        numDim = len(indices)
         wg=2 # TODO - refactor since only WG2 is supported and this is always batch
         for i in range(1, numDim):
           idx = indices[i]
