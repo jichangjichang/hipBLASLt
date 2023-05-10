@@ -74,24 +74,8 @@ class SignatureCOV3(Signature):
 
         if globalParameters["DebugKernel"]:
             signature.addArg("AddressDbg", SVK.SIG_GLOBALBUFFER, "struct", "generic")
-        signature.addArg(    "D", SVK.SIG_GLOBALBUFFER, dstValueType, "generic")
-        signature.addArg(    "C", SVK.SIG_GLOBALBUFFER, dstValueType, "generic")
         signature.addArg(    "A", SVK.SIG_GLOBALBUFFER, srcValueType, "generic")
         signature.addArg(    "B", SVK.SIG_GLOBALBUFFER, srcValueType, "generic")
-
-        # Note: We use packed f16 if alpha and beta are f16
-        if kernel["ProblemType"]["ComputeDataType"].isHalf():
-            cptValueType = 'pkf16'
-        signature.addArg(   "alpha",        SVK.SIG_VALUE, cptValueType)
-        if kernel["ProblemType"]["UseBeta"]:
-            signature.addArg("beta",        SVK.SIG_VALUE, cptValueType)
-        if kernel["ProblemType"]["UseScaleD"] and (kernel["GlobalSplitU"] == 1):
-            signature.addArg("AddressScaleD", SVK.SIG_GLOBALBUFFER, cptValueType, "generic")
-        for i in range(0, writer.states.d.numSgprStrides):
-            signature.addArg(              "strideD%u"%i, SVK.SIG_VALUE,               "u32")
-
-        for i in range(0, writer.states.c.numSgprStrides):
-            signature.addArg(              "strideC%u"%i, SVK.SIG_VALUE,               "u32")
 
         for i in range(0, writer.states.a.numSgprStrides):
             signature.addArg(              "strideA%u"%i, SVK.SIG_VALUE,               "u32")
@@ -111,16 +95,26 @@ class SignatureCOV3(Signature):
 
         signature.addArg(             "OrigStaggerUIter", SVK.SIG_VALUE,              "i32")
 
-        signature.addArg(               "NumWorkGroups0", SVK.SIG_VALUE,              "u32")
-        signature.addArg(               "NumWorkGroups1", SVK.SIG_VALUE,              "u32")
-
         if kernel["WorkGroupMapping"] > 1:
             signature.addArg(                "NumFullBlocks", SVK.SIG_VALUE,              "u32")
             signature.addArg(                "WgmRemainder1", SVK.SIG_VALUE,              "u32")
             signature.addArg(     "MagicNumberWgmRemainder1", SVK.SIG_VALUE,              "u32")
-        else:
-            signature.addArg(                      "padding", SVK.SIG_VALUE,              "u32")
 
+        signature.addArg(    "D", SVK.SIG_GLOBALBUFFER, dstValueType, "generic")
+        signature.addArg(    "C", SVK.SIG_GLOBALBUFFER, dstValueType, "generic")
+        for i in range(0, writer.states.d.numSgprStrides):
+            signature.addArg(              "strideD%u"%i, SVK.SIG_VALUE,               "u32")
+
+        for i in range(0, writer.states.c.numSgprStrides):
+            signature.addArg(              "strideC%u"%i, SVK.SIG_VALUE,               "u32")
+        # Note: We use packed f16 if alpha and beta are f16
+        if kernel["ProblemType"]["ComputeDataType"].isHalf():
+            cptValueType = 'pkf16'
+        signature.addArg(   "alpha",        SVK.SIG_VALUE, cptValueType)
+        if kernel["ProblemType"]["UseBeta"]:
+            signature.addArg("beta",        SVK.SIG_VALUE, cptValueType)
+        if kernel["ProblemType"]["UseScaleD"] and (kernel["GlobalSplitU"] == 1):
+            signature.addArg("AddressScaleD", SVK.SIG_GLOBALBUFFER, cptValueType, "generic")
         if writer.states.useBias == DataDirection.READ:
             signature.addArg("bias", SVK.SIG_GLOBALBUFFER, biasValueType, "generic")
         # We append the data in ws_d

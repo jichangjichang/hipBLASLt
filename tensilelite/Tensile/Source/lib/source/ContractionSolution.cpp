@@ -269,23 +269,6 @@ namespace Tensile
         TensorDescriptor const& c = problem.c();
         TensorDescriptor const& d = problem.d();
         TensorDescriptor const& e = problem.tensor(ContractionProblemGemm::TENSOR::E);
-
-        if(sizeMapping.globalAccumulation)
-        {
-            args.append<void const*>("ws_d", (uint8_t*)inputs.ws + workspaceOffsetInByte);
-            args.append<void const*>("ws_c", (uint8_t*)inputs.ws + workspaceOffsetInByte);
-        }
-        else if(problemType.stridedBatched)
-        {
-            args.append<void const*>("d", inputs.d);
-            args.append<void const*>("c", inputs.c);
-        }
-        else
-        {
-            args.append<void const* const*>("batchD", inputs.batchD);
-            args.append<void const* const*>("batchC", inputs.batchC);
-        }
-
         if(problemType.stridedBatched)
         {
             args.append<void const*>("a", inputs.a);
@@ -297,49 +280,8 @@ namespace Tensile
             args.append<void const* const*>("batchB", inputs.batchB);
         }
 
-        args.append("alpha", inputs.alpha, problem.alphaType());
-        if(problem.alphaType() == DataType::Half)
-            args.append("alpha_2", inputs.alpha, problem.alphaType());
-
-        if(problemType.useBeta)
-        {
-            args.append("beta", inputs.beta, problem.betaType());
-            if(problem.betaType() == DataType::Half)
-                args.append("beta_2", inputs.beta, problem.betaType());
-        }
-
-        if(problemType.useScaleD && (sizeMapping.globalSplitU == 1)) //kernel input data
-        {
-            args.append<void const*>("scaleD", inputs.scaleD);
-        }
-
         size_t startStrideCD = problemType.useInitialStridesCD ? 0 : 1;
         size_t startStrideAB = problemType.useInitialStridesAB ? 0 : 1;
-
-        if(sizeMapping.globalAccumulation)
-        {
-            size_t wsStride = startStrideCD ? d.sizes()[0] : 1;
-            for(size_t i = startStrideCD; i < d.dimensions(); i++)
-            {
-                args.append<uint32_t>(concatenate_if<T_Debug>("strideW_D", i), wsStride);
-                wsStride *= d.sizes()[i];
-            }
-
-            wsStride = startStrideCD ? d.sizes()[0] : 1;
-            for(size_t i = startStrideCD; i < c.dimensions(); i++)
-            {
-                args.append<uint32_t>(concatenate_if<T_Debug>("strideW_C", i), wsStride);
-                wsStride *= d.sizes()[i];
-            }
-        }
-        else
-        {
-            for(size_t i = startStrideCD; i < d.dimensions(); i++)
-                args.append<uint32_t>(concatenate_if<T_Debug>("strideD", i), d.strides()[i]);
-
-            for(size_t i = startStrideCD; i < c.dimensions(); i++)
-                args.append<uint32_t>(concatenate_if<T_Debug>("strideC", i), c.strides()[i]);
-        }
 
         for(size_t i = startStrideAB; i < a.dimensions(); i++)
             args.append<uint32_t>(concatenate_if<T_Debug>("strideA", i), a.strides()[i]);
@@ -348,18 +290,19 @@ namespace Tensile
             args.append<uint32_t>(concatenate_if<T_Debug>("strideB", i), b.strides()[i]);
 
         {
-            int idx = 0;
+            int    idx      = 0;
+            size_t boundIdx = problem.d().dimensions();
             for(auto size : problem.problemSizes())
             {
-                args.append<uint32_t>(concatenate_if<T_Debug>("size_", idx), size);
+                if(idx >= boundIdx && CompareValue(inputs.alpha, (double)0))
+                    args.append<uint32_t>(concatenate_if<T_Debug>("size_", idx), 0);
+                else
+                    args.append<uint32_t>(concatenate_if<T_Debug>("size_", idx), size);
                 idx++;
             }
         }
 
         args.append<int32_t>("staggerUIter", staggerUIter(problem));
-
-        args.append<uint32_t>("problemNumGroupTiles0", problemNumGroupTiles0);
-        args.append<uint32_t>("problemNumGroupTiles1", problemNumGroupTiles1);
 
         uint32_t numFullBlocks            = problemNumGroupTiles1;
         uint32_t wgmRemainder1            = 0;
@@ -386,9 +329,62 @@ namespace Tensile
                                                    * sizeMapping.globalSplitU));
         }
 
-        // address padding for epilogue alignment
-        // if(sizeMapping.workGroupMapping <= 1)
-        //     args.append<uint32_t>("PadNonUsed", 0);
+        if(sizeMapping.globalAccumulation)
+        {
+            args.append<void const*>("ws_d", (uint8_t*)inputs.ws + workspaceOffsetInByte);
+            args.append<void const*>("ws_c", (uint8_t*)inputs.ws + workspaceOffsetInByte);
+        }
+        else if(problemType.stridedBatched)
+        {
+            args.append<void const*>("d", inputs.d);
+            args.append<void const*>("c", inputs.c);
+        }
+        else
+        {
+            args.append<void const* const*>("batchD", inputs.batchD);
+            args.append<void const* const*>("batchC", inputs.batchC);
+        }
+
+        if(sizeMapping.globalAccumulation)
+        {
+            size_t wsStride = startStrideCD ? d.sizes()[0] : 1;
+            for(size_t i = startStrideCD; i < d.dimensions(); i++)
+            {
+                args.append<uint32_t>(concatenate_if<T_Debug>("strideW_D", i), wsStride);
+                wsStride *= d.sizes()[i];
+            }
+
+            wsStride = startStrideCD ? d.sizes()[0] : 1;
+            for(size_t i = startStrideCD; i < c.dimensions(); i++)
+            {
+                args.append<uint32_t>(concatenate_if<T_Debug>("strideW_C", i), wsStride);
+                wsStride *= d.sizes()[i];
+            }
+        }
+        else
+        {
+            for(size_t i = startStrideCD; i < d.dimensions(); i++)
+                args.append<uint32_t>(concatenate_if<T_Debug>("strideD", i), d.strides()[i]);
+
+            for(size_t i = startStrideCD; i < c.dimensions(); i++)
+                args.append<uint32_t>(concatenate_if<T_Debug>("strideC", i), c.strides()[i]);
+        }
+
+        args.append("alpha", inputs.alpha, problem.alphaType());
+        if(problem.alphaType() == DataType::Half)
+            args.append("alpha_2", inputs.alpha, problem.alphaType());
+
+        if(problemType.useBeta)
+        {
+            args.append("beta", inputs.beta, problem.betaType());
+            if(problem.betaType() == DataType::Half)
+                args.append("beta_2", inputs.beta, problem.betaType());
+        }
+
+        if(problemType.useScaleD && (sizeMapping.globalSplitU == 1)) //kernel input data
+        {
+            args.append<void const*>("scaleD", inputs.scaleD);
+        }
 
         bool runActivation = false;
         if((problem.activationType() != ActivationType::None) && sizeMapping.activationFused

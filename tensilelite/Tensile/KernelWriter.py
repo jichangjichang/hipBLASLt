@@ -187,18 +187,22 @@ class StateValues:
 
   numSgprSizesSum: int                   = 0
   numSgprSizesFree: int                  = 0
+  numSgprSizesAlpha: int                 = 0
+  numSgprSizesBeta: int                  = 0
   numActivationTypeArgSize: int          = 0
   numActivationArgSize: int              = 0
   numactivationArgTotalSize: int         = 0
   numSgprAddressDbg: int                 = 0
 
   firstInitSgpr: int                     = -1
+  sizesFreeSgpr: int                     = 0
   lastPostLoopSgpr: int                  = 0
   numSgprToLoad: int                     = 0 # For kernel args
   numStoreSgprToLoad: int                = 0 # For post-loop kernel args
   numStoreSgprInst: int                  = 0 # For pose-loop kernel args
   numSgprAddressBias: int                = 0
   BiasType: int                          = 0
+  numSgprAddressScaleD: int              = 0
 
   numReadPerVectorA: int                 = 0
   numReadPerVectorB: int                 = 0
@@ -2545,13 +2549,13 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.states.otherSummations      = kernel["ProblemType"]["NumIndicesSummation"]-1 # not loops but summations vars
 
     # doShadowInit performs initialization in the 'shadow' of the global mem prefetch
-    if kernel["PrefetchGlobalRead"]:
-      if self.states.actualSummationLoops == 1:
-        self.states.doShadowInit = 2 # 2 is both store setup and initC
-      else:
-        # can't do shadow initC with multiple summation since this resets the ValuC counters
-        # on each unroll iteration.
-        self.states.doShadowInit = 1 # 1 is just store setup
+    #if kernel["PrefetchGlobalRead"]:
+    #  if self.states.actualSummationLoops == 1:
+    #    self.states.doShadowInit = 2 # 2 is both store setup and initC
+    #  else:
+    #    # can't do shadow initC with multiple summation since this resets the ValuC counters
+    #    # on each unroll iteration.
+    #    self.states.doShadowInit = 1 # 1 is just store setup
 
     self.states.indexChars = []
     for i in range(0, len(globalParameters["IndexChars"])):
@@ -3264,8 +3268,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
     numSgprAddressB = self.states.rpga # til read offsets
     # would not less than 1 reg,
     # since even if ComputeType = H, we still pass the arg as a 32-bit (concate two 16-bit)
-    numSgprAlpha = max(1,int(self.states.bpeCinternal/4))
-    numSgprBeta  = max(1,int(self.states.bpeCinternal/4)) if kernel["ProblemType"]["UseBeta"] else 0
+    self.states.numSgprSizesAlpha = max(1,int(self.states.bpeCinternal/4))
+    self.states.numSgprSizesBeta  = max(1,int(self.states.bpeCinternal/4)) if kernel["ProblemType"]["UseBeta"] else 0
     self.states.e.numSgprStrides = kernel["ProblemType"]["NumIndicesC"]
     self.states.d.numSgprStrides = kernel["ProblemType"]["NumIndicesC"]
     self.states.c.numSgprStrides = kernel["ProblemType"]["NumIndicesC"]
@@ -3340,12 +3344,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if len(kernel["PackedC1IndicesX"]) > 1:
       self.defineSgpr("PackedSize1", 1)
 
-    # contractions with multiple summations will use multiple LoopCounters, if PSD=0
-    for i in range(kernel["ProblemType"]["NumIndicesSummation"]):
-      self.defineSgpr(self.loopCounterName(kernel,i), 1)
-
-    self.defineSgpr("OrigLoopCounter", 1)
-
     if globalParameters["DebugKernel"]:
       self.defineSgpr("AddressDbg", self.states.numSgprAddressDbg)
       self.defineSgpr("DebugKernelItems", 1)
@@ -3354,13 +3352,28 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.defineSgpr("SrdD", 4, 4)
       self.defineSgpr("SrdC", 4, 4)
 
-    if kernel["ProblemType"]["UseScaleD"] and (kernel["GlobalSplitU"] == 1):
-      self.defineSgpr("SrdScaleD", 4, 4)# asm input interface
+    self.defineSgpr("NumWorkGroups0", 1)
+    self.defineSgpr("NumWorkGroups1", 1)
+
+    #------------------------
+    # Registers defined below this point are not available in the post-loop
+    # Post-loop is after tail loop exits, ie the store code.
+    # (we reclaim them to use as temps, typically for execmasks)
+    # Mostly impacts flat kernels and GSU edge since these need SGPR
+    # for conditionals
+    self.states.lastPostLoopSgpr = self.sgprPool.size()
+
+    # contractions with multiple summations will use multiple LoopCounters, if PSD=0
+    for i in range(kernel["ProblemType"]["NumIndicesSummation"]):
+      self.defineSgpr(self.loopCounterName(kernel,i), 1)
+
+    self.defineSgpr("OrigLoopCounter", 1)
+
     ###################################
     # Get kernel argument start here
-    self.defineSgpr("AddressD", numSgprAddressD,4)
     # fill empty Sgpr slot caused by Sgpr alignment,
     # because we need following defineSgpr use continuous sgpr
+    self.defineSgpr("AddressA", numSgprAddressA,4)
     SgprSlot = []
     currentSize = self.sgprPool.size()
     while (1):
@@ -3370,21 +3383,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
         break
       SgprSlot.append(tempSgpr)
 
-    self.defineSgpr("AddressC", numSgprAddressC)
-    self.defineSgpr("AddressA", numSgprAddressA)
     self.defineSgpr("AddressB", numSgprAddressB)
-    self.defineSgpr("Alpha", numSgprAlpha, numSgprAlpha)
-    if kernel["ProblemType"]["UseBeta"]:
-      self.defineSgpr("Beta", numSgprBeta, numSgprBeta)
-    #asm input interface depen
-    numSgprAddressScaleD = 0
-    if kernel["ProblemType"]["UseScaleD"] and (kernel["GlobalSplitU"] == 1):
-      numSgprAddressScaleD = numSgprAddressA
-      self.defineSgpr("AddressScaleD", numSgprAddressScaleD)
-    self.defineSgpr("StridesD", self.states.d.numSgprStrides)
-    self.defineSgpr("StridesC", self.states.c.numSgprStrides)
     self.defineSgpr("StridesA", self.states.a.numSgprStrides)
     self.defineSgpr("StridesB", self.states.b.numSgprStrides)
+    # SizesFree sgpr is still neccssary for post loop
+    # Keep the sgpr index to prevent from these sgprs reclaimed.
+    self.states.sizesFreeSgpr = self.sgprPool.size()
     self.defineSgpr("SizesFree", self.states.numSgprSizesFree)
     self.defineSgpr("SizesSum", self.states.numSgprSizesSum)
 
@@ -3398,16 +3402,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.defineSgpr("MagicNumberSize%s"%idxChar, 1)
       self.defineSgpr("MagicShiftSize%s"%idxChar, 1)
     self.defineSgpr("OrigStaggerUIter", 1)  # Original stagger register.  Only needed for Persistent
-    self.defineSgpr("NumWorkGroups0", 1)
-    self.defineSgpr("NumWorkGroups1", 1)
 
-    #------------------------
-    # Registers defined below this point are not available in the post-loop
-    # Post-loop is after tail loop exits, ie the store code.
-    # (we reclaim them to use as temps, typically for execmasks)
-    # Mostly impacts flat kernels and GSU edge since these need SGPR
-    # for conditionals
-    self.states.lastPostLoopSgpr = self.sgprPool.size()
     if kernel["WorkGroupMapping"] > 1:
       self.defineSgpr("NumFullBlocks", 1) # Magic number to use for div by (NumWorkGroups1 % WGM)
       self.defineSgpr("WgmRemainder1", 1) # Magic number to use for div by (NumWorkGroups1 % WGM)
@@ -3417,14 +3412,63 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.defineSgpr("SmallMagicNumberDivWg0", 1)
       self.defineSgpr("SmallMagicNumberDivWg01", 1)
 
-    self.states.numSgprToLoad = numSgprAddressD + numSgprAddressC + numSgprAddressA + numSgprAddressB + numSgprAddressScaleD + numSgprAlpha + \
-      (numSgprBeta if kernel["ProblemType"]["UseBeta"] else 0) + self.states.d.numSgprStrides + self.states.c.numSgprStrides + self.states.a.numSgprStrides + \
-      self.states.b.numSgprStrides + self.states.numSgprSizesFree + self.states.numSgprSizesSum + \
+    self.states.numSgprToLoad = numSgprAddressA + numSgprAddressB + \
+      self.states.a.numSgprStrides + self.states.b.numSgprStrides + \
+      self.states.numSgprSizesFree + self.states.numSgprSizesSum + \
       len(kernel["PackedC0IdxChars"][:-1])*2 + len(kernel["PackedC1IdxChars"][:-1])*2 + \
       1 + \
-      2 + \
       (3 if kernel["WorkGroupMapping"] > 1 else 0) + \
       (2 if kernel["ProblemType"]["GroupedGemm"] else 0)
+
+    # calculate other post loop kernel argument counts
+    self.states.numSgprAddressScaleD = 0
+    if kernel["ProblemType"]["UseScaleD"] and (kernel["GlobalSplitU"] == 1):
+      self.states.numSgprAddressScaleD = self.states.rpga
+
+    runActivation = True if ((kernel["ProblemType"]["ActivationType"] != 'none') and (kernel["GlobalSplitU"] == 1) \
+        and kernel["ActivationFused"]) else False
+    # Bias related
+    self.states.useBias = DataDirection.NONE
+    self.states.needBiasType = False
+    if kernel["ProblemType"]["UseBias"]:
+      if kernel["ProblemType"]["Gradient"]:
+        if (kernel["GlobalSplitU"] == 1) and(kernel["ProblemType"]["BiasSrc"] == "D"):
+          self.states.useBias = DataDirection.WRITE
+        elif kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B":
+          self.states.useBias = DataDirection.WRITE
+      elif kernel["GlobalSplitU"] == 1:
+        self.states.useBias = DataDirection.READ
+      # Need bias type if the kernel supports multiple bias type.
+    if self.states.useBias == DataDirection.READ or (self.states.useBias == DataDirection.WRITE and (kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B") and kernel["GlobalSplitU"] == 1):
+      self.states.needBiasType = True
+    else:
+      self.states.needBiasType = False
+    numSgprBias = 0
+    if self.states.useBias != DataDirection.NONE and (kernel["GlobalSplitU"] == 1):
+      # Does not support atomic yet
+      self.states.numSgprAddressBias = self.states.rpga
+      self.states.BiasType = 0
+      if self.states.needBiasType:
+        if runActivation:
+          self.states.BiasType = max(1, kernel["ProblemType"]["DestDataType"].numRegisters())
+        else:
+          self.states.BiasType = 1
+      numSgprBias = self.states.numSgprAddressBias + self.states.BiasType
+
+    numSgprE = 0
+    if kernel["ProblemType"]["UseE"] and (kernel["GlobalSplitU"] == 1):
+      numSgprE = self.states.rpga + self.states.e.numSgprStrides
+
+    numSgprAct = 0
+    if runActivation:
+      if kernel["ProblemType"]["ActivationType"] == 'all':
+        self.states.numActivationTypeArgSize = 1
+      numSgprE = self.states.numActivationTypeArgSize + self.states.numactivationArgTotalSize
+
+    self.states.numStoreSgprToLoad = numSgprAddressD + numSgprAddressC  + self.states.d.numSgprStrides + self.states.c.numSgprStrides + \
+       self.states.numSgprSizesAlpha + self.states.numSgprSizesBeta + self.states.numSgprAddressScaleD +  \
+       numSgprBias + numSgprE + numSgprAct
+
     # Get kernel argument end here
     ###################################
 
@@ -3504,23 +3548,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
     canCheckValueC = canCheckValueC or kernel["ProblemType"]["DataType"].isSingle()
     canCheckValueC = canCheckValueC or (kernel["ProblemType"]["DataType"].isInt8() and kernel["ProblemType"]["HighPrecisionAccumulate"])
     assert not self.db["CheckValueC"] or canCheckValueC
-
-    # Epilogue related
-    self.states.useBias = DataDirection.NONE
-    self.states.needBiasType = False
-    if kernel["ProblemType"]["UseBias"]:
-      if kernel["ProblemType"]["Gradient"]:
-        if (kernel["GlobalSplitU"] == 1) and(kernel["ProblemType"]["BiasSrc"] == "D"):
-          self.states.useBias = DataDirection.WRITE
-        elif kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B":
-          self.states.useBias = DataDirection.WRITE
-      elif kernel["GlobalSplitU"] == 1:
-        self.states.useBias = DataDirection.READ
-      # Need bias type if the kernel supports multiple bias type.
-    if self.states.useBias == DataDirection.READ or (self.states.useBias == DataDirection.WRITE and (kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B") and kernel["GlobalSplitU"] == 1):
-      self.states.needBiasType = True
-    else:
-      self.states.needBiasType = False
 
     if self.db["InitLds"] : print ("\n***WARNING: InitLds enabled, may impact performance\n")
     if self.db["InitSgpr"] : print ("\n***WARNING: InitSgpr enabled, may impact performance\n")
