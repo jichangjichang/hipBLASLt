@@ -93,8 +93,6 @@ class SignatureCOV3(Signature):
             signature.addArg("MagicNumberSize%s"%idxChar, SVK.SIG_VALUE,               "u32")
             signature.addArg( "MagicShiftSize%s"%idxChar, SVK.SIG_VALUE,               "u32")
 
-        signature.addArg(             "OrigStaggerUIter", SVK.SIG_VALUE,              "i32")
-
         if kernel["WorkGroupMapping"] > 1:
             signature.addArg(                "NumFullBlocks", SVK.SIG_VALUE,              "u32")
             signature.addArg(                "WgmRemainder1", SVK.SIG_VALUE,              "u32")

@@ -3401,7 +3401,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
     for idxChar in kernel["PackedC1IdxChars"][:-1]:
       self.defineSgpr("MagicNumberSize%s"%idxChar, 1)
       self.defineSgpr("MagicShiftSize%s"%idxChar, 1)
-    self.defineSgpr("OrigStaggerUIter", 1)  # Original stagger register.  Only needed for Persistent
 
     if kernel["WorkGroupMapping"] > 1:
       self.defineSgpr("NumFullBlocks", 1) # Magic number to use for div by (NumWorkGroups1 % WGM)
@@ -3416,7 +3415,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.a.numSgprStrides + self.states.b.numSgprStrides + \
       self.states.numSgprSizesFree + self.states.numSgprSizesSum + \
       len(kernel["PackedC0IdxChars"][:-1])*2 + len(kernel["PackedC1IdxChars"][:-1])*2 + \
-      1 + \
       (3 if kernel["WorkGroupMapping"] > 1 else 0) + \
       (2 if kernel["ProblemType"]["GroupedGemm"] else 0)
 
@@ -3476,8 +3474,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
     while SgprSlot:
       tempSgpr = SgprSlot.pop(0)
       self.sgprPool.checkIn(tempSgpr)
-    if not self.states.staggerU:
-      self.undefineSgpr("OrigStaggerUIter")  # Original stagger register.  Only needed for Persistent
 
     ########################################
     # Register Pools

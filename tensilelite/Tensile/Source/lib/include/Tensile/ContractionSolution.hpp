@@ -240,7 +240,7 @@ namespace Tensile
         KernelInvocation generateSingleCallGroupedGemm(std::vector<Problem> const& problems,
                                                        GroupedInputs const&        inputs,
                                                        Hardware const&             hardware,
-                                                       KernelArguments &           h_args) const;
+                                                       KernelArguments&            h_args) const;
 
         template <bool T_Debug>
         KernelInvocation generateBetaOnlyCall(Problem const&           problem,
@@ -250,7 +250,7 @@ namespace Tensile
         template <bool T_Debug>
         KernelInvocation generateBetaOnlyCallGroupedGemm(std::vector<Problem> const& problems,
                                                          GroupedInputs const&        inputs,
-                                                         Hardware const&             hardware) const;
+                                                         Hardware const& hardware) const;
 
         std::string betaOnlyKernelName(Problem const& problem) const;
 
@@ -266,10 +266,11 @@ namespace Tensile
                                                       Hardware const&          hardware) const;
 
         template <bool T_Debug>
-        KernelInvocation generateOutputConversionCallGroupedGemm(std::vector<Problem> const& problems,
-                                                                 GroupedInputs const&        inputs,
-                                                                 Hardware const&             hardware,
-                                                                 KernelArguments &           h_args) const;
+        KernelInvocation
+            generateOutputConversionCallGroupedGemm(std::vector<Problem> const& problems,
+                                                    GroupedInputs const&        inputs,
+                                                    Hardware const&             hardware,
+                                                    KernelArguments&            h_args) const;
 
         std::string outputConversionKernelName(Problem const&           problem,
                                                ContractionInputs const& inputs,
@@ -377,8 +378,6 @@ namespace Tensile
         int32_t               libraryLogicIndex = -1;
         std::map<int, double> ideals;
         LinearModel           linearModel;
-
-        int32_t staggerUIter(Problem const& problem) const;
 
         uint32_t magicNumberAlg1(uint32_t x, uint32_t* magicShift) const;
         uint32_t magicNumberAlg2(uint32_t x, uint32_t* magicShift) const;
