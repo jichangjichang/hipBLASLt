@@ -2549,13 +2549,13 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.states.otherSummations      = kernel["ProblemType"]["NumIndicesSummation"]-1 # not loops but summations vars
 
     # doShadowInit performs initialization in the 'shadow' of the global mem prefetch
-    #if kernel["PrefetchGlobalRead"]:
-    #  if self.states.actualSummationLoops == 1:
-    #    self.states.doShadowInit = 2 # 2 is both store setup and initC
-    #  else:
-    #    # can't do shadow initC with multiple summation since this resets the ValuC counters
-    #    # on each unroll iteration.
-    #    self.states.doShadowInit = 1 # 1 is just store setup
+    if kernel["PrefetchGlobalRead"]:
+      if self.states.actualSummationLoops == 1:
+        self.states.doShadowInit = 2 # 2 is both store setup and initC
+      else:
+        # can't do shadow initC with multiple summation since this resets the ValuC counters
+        # on each unroll iteration.
+        self.states.doShadowInit = 1 # 1 is just store setup
 
     self.states.indexChars = []
     for i in range(0, len(globalParameters["IndexChars"])):
@@ -3355,14 +3355,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.defineSgpr("NumWorkGroups0", 1)
     self.defineSgpr("NumWorkGroups1", 1)
 
-    #------------------------
-    # Registers defined below this point are not available in the post-loop
-    # Post-loop is after tail loop exits, ie the store code.
-    # (we reclaim them to use as temps, typically for execmasks)
-    # Mostly impacts flat kernels and GSU edge since these need SGPR
-    # for conditionals
-    self.states.lastPostLoopSgpr = self.sgprPool.size()
-
     # contractions with multiple summations will use multiple LoopCounters, if PSD=0
     for i in range(kernel["ProblemType"]["NumIndicesSummation"]):
       self.defineSgpr(self.loopCounterName(kernel,i), 1)
@@ -3411,12 +3403,30 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.defineSgpr("SmallMagicNumberDivWg0", 1)
       self.defineSgpr("SmallMagicNumberDivWg01", 1)
 
+    self.defineSgpr("AddressD", numSgprAddressD)
+    self.defineSgpr("AddressC", numSgprAddressC)
+    self.defineSgpr("StridesD", self.states.d.numSgprStrides)
+    self.defineSgpr("StridesC", self.states.c.numSgprStrides)
+
+    self.defineSgpr("Alpha", self.states.numSgprSizesAlpha)
+    self.defineSgpr("Beta", self.states.numSgprSizesBeta)
+
     self.states.numSgprToLoad = numSgprAddressA + numSgprAddressB + \
       self.states.a.numSgprStrides + self.states.b.numSgprStrides + \
       self.states.numSgprSizesFree + self.states.numSgprSizesSum + \
       len(kernel["PackedC0IdxChars"][:-1])*2 + len(kernel["PackedC1IdxChars"][:-1])*2 + \
       (3 if kernel["WorkGroupMapping"] > 1 else 0) + \
-      (2 if kernel["ProblemType"]["GroupedGemm"] else 0)
+      (2 if kernel["ProblemType"]["GroupedGemm"] else 0) + \
+      numSgprAddressD + numSgprAddressC  + self.states.d.numSgprStrides + self.states.c.numSgprStrides + \
+       self.states.numSgprSizesAlpha + self.states.numSgprSizesBeta
+
+    #------------------------
+    # Registers defined below this point are not available in the post-loop
+    # Post-loop is after tail loop exits, ie the store code.
+    # (we reclaim them to use as temps, typically for execmasks)
+    # Mostly impacts flat kernels and GSU edge since these need SGPR
+    # for conditionals
+    self.states.lastPostLoopSgpr = self.sgprPool.size()
 
     # calculate other post loop kernel argument counts
     self.states.numSgprAddressScaleD = 0
@@ -3463,9 +3473,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         self.states.numActivationTypeArgSize = 1
       numSgprE = self.states.numActivationTypeArgSize + self.states.numactivationArgTotalSize
 
-    self.states.numStoreSgprToLoad = numSgprAddressD + numSgprAddressC  + self.states.d.numSgprStrides + self.states.c.numSgprStrides + \
-       self.states.numSgprSizesAlpha + self.states.numSgprSizesBeta + self.states.numSgprAddressScaleD +  \
-       numSgprBias + numSgprE + numSgprAct
+    self.states.numStoreSgprToLoad = self.states.numSgprAddressScaleD + numSgprBias + numSgprE + numSgprAct
 
     # Get kernel argument end here
     ###################################

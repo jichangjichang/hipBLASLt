@@ -2645,7 +2645,7 @@ class KernelWriterAssembly(KernelWriter):
                 shiftHex=1, comment="step down to smaller stagger"))
         module.add(SBranch(labelName=beginStaggerUIterLabel.getLabelName(), comment="jump to begin"))
         module.add(endStaggerUIterLabel)
-        module.add(SSubU32(dst=sgpr(staggerUMask), src0=sgpr(currentStaggerU), src1=1, comment="staggerU mask"))
+        module.add(SSubU32(dst=sgpr(staggerUMask), src0=sgpr(currentStaggerU), src1=1, comment="calculate taggerU mask"))
         module.add(SCmpGeU32(src0=sgpr(currentStaggerU), src1=1, \
             comment="if current staggerU >= 1" ))
         module.add(SCSelectB32(dst=sgpr("StaggerUIter"), src0=sgpr(staggerUMask), src1=0, comment="set Mask"))
@@ -3362,35 +3362,35 @@ class KernelWriterAssembly(KernelWriter):
     if storeSgprLoad:
       soffset = self.sgprs["LoadStoreSgprs"]
 
-      #D,C buffer address
-      module.add(RegSet("s", "sgprAddressD", soffset))
-      soffset +=  self.states.rpga
-      module.add(RegSet("s", "sgprAddressC", soffset))
-      soffset +=  self.states.rpga
+      ##D,C buffer address
+      #module.add(RegSet("s", "sgprAddressD", soffset))
+      #soffset +=  self.states.rpga
+      #module.add(RegSet("s", "sgprAddressC", soffset))
+      #soffset +=  self.states.rpga
 
-      #D,C buffer strides
-      module.add(RegSet("s", "sgprStridesD", soffset))
-      soffset +=  self.states.d.numSgprStrides
-      module.add(RegSet("s", "sgprStridesC", soffset))
-      soffset +=  self.states.c.numSgprStrides
-      if self.states.doShadowInit == 0:
-        for tc in ('D','C'):
-          for idx in range(0, kernel["ProblemType"]["NumIndicesC"]):
-            i = idx
-            idxChar= self.states.indexChars[idx]
-            if i == 0 and not kernel["ProblemType"]["UseInitialStridesCD"]:
-              module.add(ValueSet("constStride%s%s"%(tc,idxChar), 1))
-            else:
-              if not kernel["ProblemType"]["UseInitialStridesCD"]:
-                i = i-1
-              module.add(RegSet("s", "sgprStride%s%s"%(tc,idxChar), \
-                        "sgprStrides%s"%tc, i))
-      #alpha beta
-      module.add(RegSet("s", "sgprAlpha", soffset))
-      soffset +=  self.states.numSgprSizesAlpha
-      if self.states.numSgprSizesBeta:
-        module.add(RegSet("s", "sgprBeta", soffset))
-        soffset +=  self.states.numSgprSizesBeta
+      ##D,C buffer strides
+      #module.add(RegSet("s", "sgprStridesD", soffset))
+      #soffset +=  self.states.d.numSgprStrides
+      #module.add(RegSet("s", "sgprStridesC", soffset))
+      #soffset +=  self.states.c.numSgprStrides
+      #if self.states.doShadowInit == 0:
+      #  for tc in ('D','C'):
+      #    for idx in range(0, kernel["ProblemType"]["NumIndicesC"]):
+      #      i = idx
+      #      idxChar= self.states.indexChars[idx]
+      #      if i == 0 and not kernel["ProblemType"]["UseInitialStridesCD"]:
+      #        module.add(ValueSet("constStride%s%s"%(tc,idxChar), 1))
+      #      else:
+      #        if not kernel["ProblemType"]["UseInitialStridesCD"]:
+      #          i = i-1
+      #        module.add(RegSet("s", "sgprStride%s%s"%(tc,idxChar), \
+      #                  "sgprStrides%s"%tc, i))
+      ##alpha beta
+      #module.add(RegSet("s", "sgprAlpha", soffset))
+      #soffset +=  self.states.numSgprSizesAlpha
+      #if self.states.numSgprSizesBeta:
+      #  module.add(RegSet("s", "sgprBeta", soffset))
+      #  soffset +=  self.states.numSgprSizesBeta
 
       if self.states.numSgprAddressScaleD:
         module.add(RegSet("s", "sgprAddressScaleD", soffset))
