@@ -198,6 +198,8 @@ class StateValues:
   sizesFreeSgpr: int                     = 0
   lastPostLoopSgpr: int                  = 0
   numSgprToLoad: int                     = 0 # For kernel args
+  numSgprPreloop: int                    = 0 # For kernel args
+  numSgprPreload: int                    = 0 # For kernel args
   numStoreSgprToLoad: int                = 0 # For post-loop kernel args
   numStoreSgprInst: int                  = 0 # For pose-loop kernel args
   numSgprAddressBias: int                = 0
@@ -3411,14 +3413,25 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.defineSgpr("Alpha", self.states.numSgprSizesAlpha)
     self.defineSgpr("Beta", self.states.numSgprSizesBeta)
 
-    self.states.numSgprToLoad = numSgprAddressA + numSgprAddressB + \
+    self.states.numSgprPreloop = numSgprAddressA + numSgprAddressB + \
       self.states.a.numSgprStrides + self.states.b.numSgprStrides + \
       self.states.numSgprSizesFree + self.states.numSgprSizesSum + \
       len(kernel["PackedC0IdxChars"][:-1])*2 + len(kernel["PackedC1IdxChars"][:-1])*2 + \
       (3 if kernel["WorkGroupMapping"] > 1 else 0) + \
-      (2 if kernel["ProblemType"]["GroupedGemm"] else 0) + \
+      (2 if kernel["ProblemType"]["GroupedGemm"] else 0)
+
+    self.states.numSgprToLoad =  self.states.numSgprPreloop + \
       numSgprAddressD + numSgprAddressC  + self.states.d.numSgprStrides + self.states.c.numSgprStrides + \
        self.states.numSgprSizesAlpha + self.states.numSgprSizesBeta
+
+    # Calculate numSgpr preload
+    self.states.numSgprPreload = 0
+    if kernel["PreloadKernArgs"]:
+      # Max num spgrs can be setup by CP is 16
+      # kernel argument buffer address needs 2 sgprs
+      # Workgroup ID x, y, z need 3 sgprs
+      numWorkgroupIDSgpr = 3 if kernel["ProblemType"]["NumIndicesC"] > 2 else 2
+      self.states.numSgprPreload = 16 - 2 - numWorkgroupIDSgpr
 
     #------------------------
     # Registers defined below this point are not available in the post-loop

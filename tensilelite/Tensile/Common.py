@@ -907,6 +907,7 @@ validParameters = {
     # For example, InnerUnroll=2 will fetch LDS for two unroll iterations
     "InnerUnroll":                [1,2,4,8,16,32,64],
 
+    "PreloadKernArgs":               [False, True],
     # Kernels should be written in assembly or source
     # if assembly, ISA will determine architecture
     # if source, Runtime will determine language
@@ -1017,6 +1018,7 @@ defaultBenchmarkCommonParameters = [
     {"NonTemporalC":              [ 0 ] },
     {"NonTemporalA":              [ 0 ] },
     {"NonTemporalB":              [ 0 ] },
+    {"PreloadKernArgs":           [ False ] },
     {"CustomKernelName":          [ "" ] },
     {"NoReject":                  [ False ]},
     {"MinVgprNumber":             [0]},

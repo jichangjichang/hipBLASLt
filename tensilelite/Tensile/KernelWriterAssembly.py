@@ -538,18 +538,18 @@ class KernelWriterAssembly(KernelWriter):
 
     module.addSpaceLine()
     module.addComment0("Stride Assignments")
-    if self.states.doShadowInit:
-      for tc in ('D','C'):
-        for idx in range(0, problemType["NumIndicesC"]):
-          i = idx
-          idxChar= self.states.indexChars[idx]
-          if i == 0 and not kernel["ProblemType"]["UseInitialStridesCD"]:
-            module.add(ValueSet("constStride%s%s"%(tc,idxChar), 1))
-          else:
-            if not kernel["ProblemType"]["UseInitialStridesCD"]:
-              i = i-1
-            module.add(RegSet("s", "sgprStride%s%s"%(tc,idxChar), \
-                      "sgprStrides%s"%tc, i))
+    #if self.states.doShadowInit:
+    for tc in ('D','C'):
+      for idx in range(0, problemType["NumIndicesC"]):
+        i = idx
+        idxChar= self.states.indexChars[idx]
+        if i == 0 and not kernel["ProblemType"]["UseInitialStridesCD"]:
+          module.add(ValueSet("constStride%s%s"%(tc,idxChar), 1))
+        else:
+          if not kernel["ProblemType"]["UseInitialStridesCD"]:
+            i = i-1
+          module.add(RegSet("s", "sgprStride%s%s"%(tc,idxChar), \
+                    "sgprStrides%s"%tc, i))
 
     for tc in ('A','B'):
       for i, idx in enumerate(problemType["IndexAssignments%s"%tc]):
@@ -951,11 +951,15 @@ class KernelWriterAssembly(KernelWriter):
 
       load = self.states.numSgprToLoad
       sgprStart = self.sgprs["AddressA"]
-      moduleArgs.addModuleAsFlatItems(self.argLoader.loadAllKernArg(sgprStart, "KernArgAddress", load))
+      moduleArgs.addModuleAsFlatItems( \
+         self.argLoader.loadAllKernArg(sgprStart, "KernArgAddress", load, self.states.numSgprPreload))
       if kernel.enabledSetPrioSplitLDS:
         moduleArgs.add(SSetPrior(prior=1, comment="prioritize init code so as to issue load sooner"))
       moduleArgs.addModuleAsFlatItems(lralwaCode)
-      moduleArgs.add(SWaitCnt(lgkmcnt=0, comment="wait for %u bytes of kern args" % self.argLoader.getOffset()))
+      if (self.states.numSgprPreloop > self.states.numSgprPreload ) or \
+         (not kernel["PrefetchGlobalRead"] and self.states.numSgprToLoad > self.states.numSgprPreload):
+        moduleArgs.add(SWaitCnt(lgkmcnt=0, comment="wait for %u bytes of kern args" \
+           % (self.argLoader.getOffset() - (self.states.numSgprPreload * 4))))
 
       #### calculate numWorkGroup ####
       with self.allocTmpSgpr(2) as tmpSgprInfo:
@@ -2529,6 +2533,10 @@ class KernelWriterAssembly(KernelWriter):
   def openShadowInit(self):
     module = Module("openShadowInit")
     module.add(Label("ShadowInitStart", ""))
+    if self.states.numSgprPreloop <= self.states.numSgprPreload and \
+        self.states.numSgprToLoad > self.states.numSgprPreload:
+      module.add(SWaitCnt(lgkmcnt=0, comment="wait for %u bytes of kern args" \
+         % (self.argLoader.getOffset() - (self.states.numSgprPreload * 4))))
     return module
 
   ##############################################################################
@@ -3414,7 +3422,8 @@ class KernelWriterAssembly(KernelWriter):
       if self.states.numActivationTypeArgSize:
         module.add(RegSet("s", "sgprActivationType", soffset))
       argOffset = self.argLoader.getOffset() # Backup offset
-      loadModule = module.addModuleAsFlatItems(self.argLoader.loadAllKernArg(self.sgprs["LoadStoreSgprs"], "KernArgAddress", storeSgprLoad))
+      loadModule = module.addModuleAsFlatItems( \
+          self.argLoader.loadAllKernArg(self.sgprs["LoadStoreSgprs"], "KernArgAddress", storeSgprLoad))
       self.states.numStoreSgprInst = loadModule.countType(SMemLoadInstruction)
       self.argLoader.setOffset(argOffset) # Restore offset
 
