@@ -415,9 +415,9 @@ public:
         return os << s.c_str();
     }
 
-    // hipblasDatatype_t output
+    // hipblasltDatatype_t output
     friend hipblaslt_internal_ostream& operator<<(hipblaslt_internal_ostream& os,
-                                                  hipblasDatatype_t           d)
+                                                  hipblasltDatatype_t           d)
     {
         os.m_os << hipblas_datatype_to_string(d);
         return os;

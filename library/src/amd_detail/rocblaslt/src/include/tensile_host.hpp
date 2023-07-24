@@ -105,7 +105,7 @@ struct RocblasltContractionProblem
 
     const void*        bias;
     const Tc*          scaleDVec;
-    hipblasDatatype_t  bias_type;
+    hipblasltDatatype_t  bias_type;
     rocblaslt_epilogue epilogue;
     void*              workspace;
     size_t             workspaceSize;
@@ -148,7 +148,7 @@ struct RocblasltContractionProblem
                                 rocblaslt_compute_type compute_type,
                                 const void*            bias,
                                 const Tc*              scaleDVec,
-                                hipblasDatatype_t      bias_type,
+                                hipblasltDatatype_t      bias_type,
                                 rocblaslt_epilogue     epilogue,
                                 void*                  workspace,
                                 size_t                 workspaceSize,
@@ -205,10 +205,10 @@ void initTensileGemmData(rocblaslt_handle       handle,
                          rocblaslt::RocGemmType gemmType,
                          hipblasOperation_t     opA,
                          hipblasOperation_t     opB,
-                         hipblasDatatype_t      typeA,
-                         hipblasDatatype_t      typeB,
-                         hipblasDatatype_t      typeC,
-                         hipblasDatatype_t      typeD,
+                         hipblasltDatatype_t      typeA,
+                         hipblasltDatatype_t      typeB,
+                         hipblasltDatatype_t      typeC,
+                         hipblasltDatatype_t      typeD,
                          rocblaslt_compute_type typeCompute,
                          size_t                 maxWorkspaceBytes,
                          std::shared_ptr<void>& gemmData);

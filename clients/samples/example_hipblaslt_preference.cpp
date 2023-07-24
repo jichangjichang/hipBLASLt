@@ -362,7 +362,7 @@ static void show_usage(char* argv[])
 
 static int parse_arguments(int                 argc,
                            char*               argv[],
-                           hipblasDatatype_t&  in_out_datatype,
+                           hipblasltDatatype_t&  in_out_datatype,
                            int64_t&            m,
                            int64_t&            n,
                            int64_t&            k,
@@ -588,15 +588,15 @@ static int parse_arguments(int                 argc,
                     ++i;
                     if(strncmp(argv[i], "fp32", 4) == 0)
                     {
-                        in_out_datatype = HIPBLAS_R_32F;
+                        in_out_datatype = HIPBLASLT_R_32F;
                     }
                     else if(strncmp(argv[i], "fp16", 4) == 0)
                     {
-                        in_out_datatype = HIPBLAS_R_16F;
+                        in_out_datatype = HIPBLASLT_R_16F;
                     }
                     else if(strncmp(argv[i], "bf16", 4) == 0)
                     {
-                        in_out_datatype = HIPBLAS_R_16B;
+                        in_out_datatype = HIPBLASLT_R_16B;
                     }
                     else
                     {
@@ -803,7 +803,7 @@ void initialize_a_b_c_e_bias(std::vector<T>&     ha,
 }
 
 template <typename T>
-void test_hipblaslt(hipblasDatatype_t  in_out_datatype,
+void test_hipblaslt(hipblasltDatatype_t  in_out_datatype,
                     hipblasOperation_t trans_a,
                     hipblasOperation_t trans_b,
                     int64_t            m,
@@ -989,7 +989,7 @@ void test_hipblaslt(hipblasDatatype_t  in_out_datatype,
             matD, HIPBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &stride_d, sizeof(stride_d)));
     }
 
-    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescCreate(&matmul, HIPBLASLT_COMPUTE_F32, HIPBLAS_R_32F));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescCreate(&matmul, HIPBLASLT_COMPUTE_F32, HIPBLASLT_R_32F));
 
     CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescSetAttribute(
         matmul, HIPBLASLT_MATMUL_DESC_TRANSA, &trans_a, sizeof(int32_t)));
@@ -1631,7 +1631,7 @@ int main(int argc, char* argv[])
     // initialize parameters with default values
     hipblasOperation_t trans_a         = HIPBLAS_OP_N;
     hipblasOperation_t trans_b         = HIPBLAS_OP_N;
-    hipblasDatatype_t  in_out_datatype = HIPBLAS_R_32F;
+    hipblasltDatatype_t  in_out_datatype = HIPBLASLT_R_32F;
 
     int64_t invalid_int   = std::numeric_limits<int64_t>::min() + 1;
     float   invalid_float = std::numeric_limits<float>::quiet_NaN();
@@ -1780,7 +1780,7 @@ int main(int argc, char* argv[])
         std::cout << std::endl;
     }
 
-    if(in_out_datatype == HIPBLAS_R_32F)
+    if(in_out_datatype == HIPBLASLT_R_32F)
         test_hipblaslt<hipblasLtFloat>(in_out_datatype,
                                        trans_a,
                                        trans_b,
@@ -1814,7 +1814,7 @@ int main(int argc, char* argv[])
                                        cold_loop_count,
                                        useExt,
                                        findAll);
-    else if(in_out_datatype == HIPBLAS_R_16F)
+    else if(in_out_datatype == HIPBLASLT_R_16F)
         test_hipblaslt<hipblasLtHalf>(in_out_datatype,
                                       trans_a,
                                       trans_b,
@@ -1848,7 +1848,7 @@ int main(int argc, char* argv[])
                                       cold_loop_count,
                                       useExt,
                                       findAll);
-    else if(in_out_datatype == HIPBLAS_R_16B)
+    else if(in_out_datatype == HIPBLASLT_R_16B)
         test_hipblaslt<hipblasLtBfloat16>(in_out_datatype,
                                           trans_a,
                                           trans_b,

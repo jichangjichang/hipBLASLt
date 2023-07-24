@@ -126,10 +126,10 @@ namespace hipblaslt_ext
     Gemm::Gemm(hipblasLtHandle_t      handle,
                hipblasOperation_t     opA,
                hipblasOperation_t     opB,
-               hipblasDatatype_t      typeA,
-               hipblasDatatype_t      typeB,
-               hipblasDatatype_t      typeC,
-               hipblasDatatype_t      typeD,
+               hipblasltDatatype_t      typeA,
+               hipblasltDatatype_t      typeB,
+               hipblasltDatatype_t      typeC,
+               hipblasltDatatype_t      typeD,
                hipblasLtComputeType_t typeCompute)
         : GemmInstance(handle, GemmType::HIPBLASLT_GEMM)
     {
@@ -280,10 +280,10 @@ namespace hipblaslt_ext
     HIPBLASLT_EXPORT GroupedGemm::GroupedGemm(hipblasLtHandle_t      handle,
                                               hipblasOperation_t     opA,
                                               hipblasOperation_t     opB,
-                                              hipblasDatatype_t      typeA,
-                                              hipblasDatatype_t      typeB,
-                                              hipblasDatatype_t      typeC,
-                                              hipblasDatatype_t      typeD,
+                                              hipblasltDatatype_t      typeA,
+                                              hipblasltDatatype_t      typeB,
+                                              hipblasltDatatype_t      typeC,
+                                              hipblasltDatatype_t      typeD,
                                               hipblasLtComputeType_t typeCompute)
         : GemmInstance(handle, GemmType::HIPBLASLT_GROUPED_GEMM)
     {
@@ -506,10 +506,10 @@ namespace hipblaslt_ext
                                 GemmType                                       typeGemm,
                                 hipblasOperation_t                             opA,
                                 hipblasOperation_t                             opB,
-                                hipblasDatatype_t                              typeA,
-                                hipblasDatatype_t                              typeB,
-                                hipblasDatatype_t                              typeC,
-                                hipblasDatatype_t                              typeD,
+                                hipblasltDatatype_t                              typeA,
+                                hipblasltDatatype_t                              typeB,
+                                hipblasltDatatype_t                              typeC,
+                                hipblasltDatatype_t                              typeD,
                                 hipblasLtComputeType_t                         typeCompute,
                                 std::vector<hipblasLtMatmulHeuristicResult_t>& heuristicResults)
     try

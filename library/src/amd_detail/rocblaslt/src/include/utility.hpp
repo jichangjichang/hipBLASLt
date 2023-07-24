@@ -42,15 +42,15 @@ inline bool isAligned(const void* pointer, size_t byte_count)
 }
 
 // return precision string for rocblaslt_datatype
-constexpr const char* rocblaslt_datatype_string(hipblasDatatype_t type)
+constexpr const char* rocblaslt_datatype_string(hipblasltDatatype_t type)
 {
     switch(type)
     {
-    case HIPBLAS_R_16F:
+    case HIPBLASLT_R_16F:
         return "f16_r";
-    case HIPBLAS_R_32F:
+    case HIPBLASLT_R_32F:
         return "f32_r";
-    case HIPBLAS_R_16B:
+    case HIPBLASLT_R_16B:
         return "b16_r";
     default:
         return "invalidType";
@@ -133,7 +133,7 @@ static constexpr char rocblaslt_precision_string<uint32_t>[] = "u32_r";
 
 std::string prefix(const char* layer, const char* caller);
 
-const char* hipblasDatatype_to_string(hipblasDatatype_t type);
+const char* hipblasltDatatype_to_string(hipblasltDatatype_t type);
 
 const char* rocblaslt_compute_type_to_string(rocblaslt_compute_type type);
 

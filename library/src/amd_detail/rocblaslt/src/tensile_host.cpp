@@ -89,18 +89,18 @@ namespace
     /******************************************************
  * Map a hipblas data type to a corresponding Tensile type *
  ******************************************************/
-    inline Tensile::DataType hipblasDatatype_to_tensile_type(hipblasDatatype_t type)
+    inline Tensile::DataType hipblasltDatatype_to_tensile_type(hipblasltDatatype_t type)
     {
         switch(type)
         {
-        case HIPBLAS_R_16F:
+        case HIPBLASLT_R_16F:
             return Tensile::DataType::Half;
-        case HIPBLAS_R_32F:
+        case HIPBLASLT_R_32F:
             return Tensile::DataType::Float;
-        case HIPBLAS_R_16B:
+        case HIPBLASLT_R_16B:
             return Tensile::DataType::BFloat16;
         default:
-            assert(!"hipblasDatatype_to_tensile_type: non-supported type");
+            assert(!"hipblasltDatatype_to_tensile_type: non-supported type");
             return Tensile::DataType::None;
         }
     }
@@ -201,15 +201,15 @@ namespace
         return Tensile::ContractionProblemGemm::TENSOR::D;
     }
 
-    Tensile::DataType hip2TensileType(hipblasDatatype_t type)
+    Tensile::DataType hip2TensileType(hipblasltDatatype_t type)
     {
         switch(type)
         {
-        case HIPBLAS_R_32F:
+        case HIPBLASLT_R_32F:
             return Tensile::DataType::Float;
-        case HIPBLAS_R_16F:
+        case HIPBLASLT_R_16F:
             return Tensile::DataType::Half;
-        case HIPBLAS_R_16B:
+        case HIPBLASLT_R_16B:
             return Tensile::DataType::BFloat16;
         default:
             throw std::runtime_error("Unsupported type.");
@@ -217,20 +217,20 @@ namespace
         return Tensile::DataType::None;
     }
 
-    hipblasDatatype_t tensile2HipType(Tensile::DataType type)
+    hipblasltDatatype_t tensile2HipType(Tensile::DataType type)
     {
         switch(type)
         {
         case Tensile::DataType::Float:
-            return HIPBLAS_R_32F;
+            return HIPBLASLT_R_32F;
         case Tensile::DataType::Half:
-            return HIPBLAS_R_16F;
+            return HIPBLASLT_R_16F;
         case Tensile::DataType::BFloat16:
-            return HIPBLAS_R_16B;
+            return HIPBLASLT_R_16B;
         default:
             throw std::runtime_error("Unsupported type.");
         }
-        return HIPBLAS_R_32F;
+        return HIPBLASLT_R_32F;
     }
 
     Tensile::DataType roc2TensileType(rocblaslt_compute_type type)
@@ -261,10 +261,10 @@ namespace
 
     inline auto CreateTensileProblem(hipblasOperation_t     opA,
                                      hipblasOperation_t     opB,
-                                     hipblasDatatype_t      typeA,
-                                     hipblasDatatype_t      typeB,
-                                     hipblasDatatype_t      typeC,
-                                     hipblasDatatype_t      typeD,
+                                     hipblasltDatatype_t      typeA,
+                                     hipblasltDatatype_t      typeB,
+                                     hipblasltDatatype_t      typeC,
+                                     hipblasltDatatype_t      typeD,
                                      rocblaslt_compute_type typeCompute,
                                      float                  alpha,
                                      float                  beta,
@@ -440,7 +440,7 @@ namespace
             = (biasSrc == Tensile::ContractionProblemGemm::TENSOR::B) ? d.sizes()[1] : d.sizes()[0];
         tensileProblem.setUseBias(true);
         tensileProblem.setBias(
-            hipblasDatatype_to_tensile_type(prob.bias_type), biasSize, prob.gradient, biasSrc);
+            hipblasltDatatype_to_tensile_type(prob.bias_type), biasSize, prob.gradient, biasSrc);
 
         // set ScaleDVec mode
         tensileProblem.setUseScaleDVec(true);
@@ -601,7 +601,7 @@ namespace
                                                                                     : d.sizes()[0];
             tensileProblem.setUseBias(true);
             tensileProblem.setBias(
-                hipblasDatatype_to_tensile_type(prob.bias_type), biasSize, prob.gradient, biasSrc);
+                hipblasltDatatype_to_tensile_type(prob.bias_type), biasSize, prob.gradient, biasSrc);
 
             // set ScaleDVec mode
             tensileProblem.setUseScaleDVec(true);
@@ -1027,10 +1027,10 @@ void initTensileGemmData(rocblaslt_handle       handle,
                          rocblaslt::RocGemmType gemmType,
                          hipblasOperation_t     opA,
                          hipblasOperation_t     opB,
-                         hipblasDatatype_t      typeA,
-                         hipblasDatatype_t      typeB,
-                         hipblasDatatype_t      typeC,
-                         hipblasDatatype_t      typeD,
+                         hipblasltDatatype_t      typeA,
+                         hipblasltDatatype_t      typeB,
+                         hipblasltDatatype_t      typeC,
+                         hipblasltDatatype_t      typeD,
                          rocblaslt_compute_type typeCompute,
                          size_t                 maxWorkspaceBytes,
                          std::shared_ptr<void>& gemmData)

@@ -66,7 +66,7 @@ rocblaslt_status rocblaslt_batched_template(rocblaslt_handle             handle,
                                             size_t                       workspaceSizeInBytes,
                                             const void*                  bias,
                                             const Tc*                    scaleDVec,
-                                            hipblasDatatype_t            bias_type,
+                                            hipblasltDatatype_t            bias_type,
                                             rocblaslt_epilogue           epilogue,
                                             std::shared_ptr<void>        gemmData,
                                             hipStream_t                  stream)
@@ -144,7 +144,7 @@ rocblaslt_status rocblaslt_gemm_create_batched_template(hipblasOperation_t     t
                                                         rocblaslt_compute_type compute_type,
                                                         const void*            bias,
                                                         const Tc*              scaleDVec,
-                                                        hipblasDatatype_t      bias_type,
+                                                        hipblasltDatatype_t      bias_type,
                                                         rocblaslt_epilogue     epilogue,
                                                         std::shared_ptr<void>& gemmData,
                                                         size_t&                gemmCount)
@@ -222,7 +222,7 @@ rocblaslt_status
                                                   std::vector<bool>&               gradient,
                                                   std::vector<const void*>&        bias,
                                                   std::vector<const Tc*>&          scaleDVec,
-                                                  std::vector<hipblasDatatype_t>&  bias_type,
+                                                  std::vector<hipblasltDatatype_t>&  bias_type,
                                                   std::vector<rocblaslt_epilogue>& epilogue,
                                                   std::shared_ptr<void>&           gemmData,
                                                   size_t&                          gemmCount)
@@ -308,7 +308,7 @@ rocblaslt_status rocblaslt_matmul_typecasting(rocblaslt_handle             handl
                                               size_t                       workspaceSizeInBytes,
                                               const void*                  bias,
                                               const void*                  scaleDVec,
-                                              hipblasDatatype_t            bias_type,
+                                              hipblasltDatatype_t            bias_type,
                                               rocblaslt_epilogue           epilogue,
                                               std::shared_ptr<void>        gemmData,
                                               hipStream_t                  stream)
@@ -389,7 +389,7 @@ rocblaslt_status rocblaslt_gemm_create_typecasting(hipblasOperation_t     trans_
                                                    rocblaslt_compute_type compute_type,
                                                    const void*            bias,
                                                    const void*            scaleDVec,
-                                                   hipblasDatatype_t      bias_type,
+                                                   hipblasltDatatype_t      bias_type,
                                                    rocblaslt_epilogue     epilogue,
                                                    std::shared_ptr<void>& gemmData,
                                                    size_t&                gemmCount)
@@ -466,7 +466,7 @@ rocblaslt_status rocblaslt_groupedgemm_create_typecasting(hipblasOperation_t    
                                                           std::vector<bool>&        gradient,
                                                           std::vector<const void*>& bias,
                                                           std::vector<const void*>& scaleDVec,
-                                                          std::vector<hipblasDatatype_t>& bias_type,
+                                                          std::vector<hipblasltDatatype_t>& bias_type,
                                                           std::vector<rocblaslt_epilogue>& epilogue,
                                                           std::shared_ptr<void>&           gemmData,
                                                           size_t& gemmCount)
@@ -531,20 +531,20 @@ inline rocblaslt_status rocblaslt_matmul_template(rocblaslt_handle             h
                                                   int64_t                      k,
                                                   const void*                  alpha,
                                                   const void*                  a,
-                                                  hipblasDatatype_t            a_type,
+                                                  hipblasltDatatype_t            a_type,
                                                   int64_t                      ld_a,
                                                   int64_t                      batch_stride_a,
                                                   const void*                  b,
-                                                  hipblasDatatype_t            b_type,
+                                                  hipblasltDatatype_t            b_type,
                                                   int64_t                      ld_b,
                                                   int64_t                      batch_stride_b,
                                                   const void*                  beta,
                                                   const void*                  c,
-                                                  hipblasDatatype_t            c_type,
+                                                  hipblasltDatatype_t            c_type,
                                                   int64_t                      ld_c,
                                                   int64_t                      batch_stride_c,
                                                   void*                        d,
-                                                  hipblasDatatype_t            d_type,
+                                                  hipblasltDatatype_t            d_type,
                                                   int64_t                      ld_d,
                                                   int64_t                      batch_stride_d,
                                                   void*                        e,
@@ -560,7 +560,7 @@ inline rocblaslt_status rocblaslt_matmul_template(rocblaslt_handle             h
                                                   size_t                       workspaceSizeInBytes,
                                                   const void*                  bias,
                                                   const void*                  scaleDVec,
-                                                  hipblasDatatype_t            bias_type,
+                                                  hipblasltDatatype_t            bias_type,
                                                   rocblaslt_epilogue           epilogue,
                                                   std::shared_ptr<void>        gemmData,
                                                   hipStream_t                  stream)
@@ -573,9 +573,9 @@ inline rocblaslt_status rocblaslt_matmul_template(rocblaslt_handle             h
         batch_count, strided_batch, grouped_gemm, gradient, compute_type, algo, workspace,      \
         workspaceSizeInBytes, bias, scaleDVec, bias_type, epilogue, gemmData, stream
 
-    if(a_type == HIPBLAS_R_32F && b_type == HIPBLAS_R_32F)
+    if(a_type == HIPBLASLT_R_32F && b_type == HIPBLASLT_R_32F)
     {
-        if(c_type == HIPBLAS_R_32F && d_type == HIPBLAS_R_32F)
+        if(c_type == HIPBLASLT_R_32F && d_type == HIPBLASLT_R_32F)
         {
             if(compute_type == rocblaslt_compute_f32
                || compute_type == rocblaslt_compute_f32_fast_xf32)
@@ -584,9 +584,9 @@ inline rocblaslt_status rocblaslt_matmul_template(rocblaslt_handle             h
             }
         }
     }
-    else if(a_type == HIPBLAS_R_16F && b_type == HIPBLAS_R_16F)
+    else if(a_type == HIPBLASLT_R_16F && b_type == HIPBLASLT_R_16F)
     {
-        if(c_type == HIPBLAS_R_16F && d_type == HIPBLAS_R_16F)
+        if(c_type == HIPBLASLT_R_16F && d_type == HIPBLASLT_R_16F)
         {
             if(compute_type == rocblaslt_compute_f32)
             {
@@ -594,7 +594,7 @@ inline rocblaslt_status rocblaslt_matmul_template(rocblaslt_handle             h
                     EX_TYPECASTING_PARM);
             }
         }
-        else if(c_type == HIPBLAS_R_32F && d_type == HIPBLAS_R_32F)
+        else if(c_type == HIPBLASLT_R_32F && d_type == HIPBLASLT_R_32F)
         {
             if(compute_type == rocblaslt_compute_f32)
             {
@@ -603,9 +603,9 @@ inline rocblaslt_status rocblaslt_matmul_template(rocblaslt_handle             h
             }
         }
     }
-    else if(a_type == HIPBLAS_R_16B && b_type == HIPBLAS_R_16B)
+    else if(a_type == HIPBLASLT_R_16B && b_type == HIPBLASLT_R_16B)
     {
-        if(c_type == HIPBLAS_R_16B && d_type == HIPBLAS_R_16B)
+        if(c_type == HIPBLASLT_R_16B && d_type == HIPBLASLT_R_16B)
         {
             if(compute_type == rocblaslt_compute_f32)
             {
@@ -630,20 +630,20 @@ inline rocblaslt_status rocblaslt_gemm_create_template_cpp(hipblasOperation_t   
                                                            int64_t                k,
                                                            const void*            alpha,
                                                            const void*            a,
-                                                           hipblasDatatype_t      a_type,
+                                                           hipblasltDatatype_t      a_type,
                                                            int64_t                ld_a,
                                                            int64_t                batch_stride_a,
                                                            const void*            b,
-                                                           hipblasDatatype_t      b_type,
+                                                           hipblasltDatatype_t      b_type,
                                                            int64_t                ld_b,
                                                            int64_t                batch_stride_b,
                                                            const void*            beta,
                                                            const void*            c,
-                                                           hipblasDatatype_t      c_type,
+                                                           hipblasltDatatype_t      c_type,
                                                            int64_t                ld_c,
                                                            int64_t                batch_stride_c,
                                                            void*                  d,
-                                                           hipblasDatatype_t      d_type,
+                                                           hipblasltDatatype_t      d_type,
                                                            int64_t                ld_d,
                                                            int64_t                batch_stride_d,
                                                            void*                  e,
@@ -656,7 +656,7 @@ inline rocblaslt_status rocblaslt_gemm_create_template_cpp(hipblasOperation_t   
                                                            rocblaslt_compute_type compute_type,
                                                            const void*            bias,
                                                            const void*            scaleDVec,
-                                                           hipblasDatatype_t      bias_type,
+                                                           hipblasltDatatype_t      bias_type,
                                                            rocblaslt_epilogue     epilogue,
                                                            std::shared_ptr<void>& gemmData,
                                                            size_t&                gemmCount)
@@ -669,9 +669,9 @@ inline rocblaslt_status rocblaslt_gemm_create_template_cpp(hipblasOperation_t   
         strided_batch, grouped_gemm, gradient, compute_type, bias, scaleDVec, bias_type, epilogue, \
         gemmData, gemmCount
 
-    if(a_type == HIPBLAS_R_32F && b_type == HIPBLAS_R_32F)
+    if(a_type == HIPBLASLT_R_32F && b_type == HIPBLASLT_R_32F)
     {
-        if(c_type == HIPBLAS_R_32F && d_type == HIPBLAS_R_32F)
+        if(c_type == HIPBLASLT_R_32F && d_type == HIPBLASLT_R_32F)
         {
             if(compute_type == rocblaslt_compute_f32
                || compute_type == rocblaslt_compute_f32_fast_xf32)
@@ -681,9 +681,9 @@ inline rocblaslt_status rocblaslt_gemm_create_template_cpp(hipblasOperation_t   
             }
         }
     }
-    else if(a_type == HIPBLAS_R_16F && b_type == HIPBLAS_R_16F)
+    else if(a_type == HIPBLASLT_R_16F && b_type == HIPBLASLT_R_16F)
     {
-        if(c_type == HIPBLAS_R_16F && d_type == HIPBLAS_R_16F)
+        if(c_type == HIPBLASLT_R_16F && d_type == HIPBLASLT_R_16F)
         {
             if(compute_type == rocblaslt_compute_f32)
             {
@@ -692,7 +692,7 @@ inline rocblaslt_status rocblaslt_gemm_create_template_cpp(hipblasOperation_t   
                         EX_TYPECASTING_PARM_GEMM_CPP);
             }
         }
-        else if(c_type == HIPBLAS_R_32F && d_type == HIPBLAS_R_32F)
+        else if(c_type == HIPBLASLT_R_32F && d_type == HIPBLASLT_R_32F)
         {
             if(compute_type == rocblaslt_compute_f32)
             {
@@ -701,9 +701,9 @@ inline rocblaslt_status rocblaslt_gemm_create_template_cpp(hipblasOperation_t   
             }
         }
     }
-    else if(a_type == HIPBLAS_R_16B && b_type == HIPBLAS_R_16B)
+    else if(a_type == HIPBLASLT_R_16B && b_type == HIPBLASLT_R_16B)
     {
-        if(c_type == HIPBLAS_R_16B && d_type == HIPBLAS_R_16B)
+        if(c_type == HIPBLASLT_R_16B && d_type == HIPBLASLT_R_16B)
         {
             if(compute_type == rocblaslt_compute_f32)
             {
@@ -729,20 +729,20 @@ inline rocblaslt_status
                                               std::vector<int64_t>&            k,
                                               std::vector<const void*>&        alpha,
                                               std::vector<const void*>&        a,
-                                              hipblasDatatype_t                a_type,
+                                              hipblasltDatatype_t                a_type,
                                               std::vector<int64_t>&            ld_a,
                                               std::vector<int64_t>&            batch_stride_a,
                                               std::vector<const void*>&        b,
-                                              hipblasDatatype_t                b_type,
+                                              hipblasltDatatype_t                b_type,
                                               std::vector<int64_t>&            ld_b,
                                               std::vector<int64_t>&            batch_stride_b,
                                               std::vector<const void*>&        beta,
                                               std::vector<const void*>&        c,
-                                              hipblasDatatype_t                c_type,
+                                              hipblasltDatatype_t                c_type,
                                               std::vector<int64_t>&            ld_c,
                                               std::vector<int64_t>&            batch_stride_c,
                                               std::vector<void*>&              d,
-                                              hipblasDatatype_t                d_type,
+                                              hipblasltDatatype_t                d_type,
                                               std::vector<int64_t>&            ld_d,
                                               std::vector<int64_t>&            batch_stride_d,
                                               std::vector<void*>&              e,
@@ -755,7 +755,7 @@ inline rocblaslt_status
                                               rocblaslt_compute_type           compute_type,
                                               std::vector<const void*>&        bias,
                                               std::vector<const void*>&        scaleDVec,
-                                              std::vector<hipblasDatatype_t>&  bias_type,
+                                              std::vector<hipblasltDatatype_t>&  bias_type,
                                               std::vector<rocblaslt_epilogue>& epilogue,
                                               std::shared_ptr<void>&           gemmData,
                                               size_t&                          gemmCount)
@@ -768,9 +768,9 @@ inline rocblaslt_status
         strided_batch, grouped_gemm, compute_type, gradient, bias, scaleDVec, bias_type, epilogue, \
         gemmData, gemmCount
 
-    if(a_type == HIPBLAS_R_32F && b_type == HIPBLAS_R_32F)
+    if(a_type == HIPBLASLT_R_32F && b_type == HIPBLASLT_R_32F)
     {
-        if(c_type == HIPBLAS_R_32F && d_type == HIPBLAS_R_32F)
+        if(c_type == HIPBLASLT_R_32F && d_type == HIPBLASLT_R_32F)
         {
             if(compute_type == rocblaslt_compute_f32
                || compute_type == rocblaslt_compute_f32_fast_xf32)
@@ -780,9 +780,9 @@ inline rocblaslt_status
             }
         }
     }
-    else if(a_type == HIPBLAS_R_16F && b_type == HIPBLAS_R_16F)
+    else if(a_type == HIPBLASLT_R_16F && b_type == HIPBLASLT_R_16F)
     {
-        if(c_type == HIPBLAS_R_16F && d_type == HIPBLAS_R_16F)
+        if(c_type == HIPBLASLT_R_16F && d_type == HIPBLASLT_R_16F)
         {
             if(compute_type == rocblaslt_compute_f32)
             {
@@ -792,7 +792,7 @@ inline rocblaslt_status
                     EX_TYPECASTING_PARM_GroupedGemm_CPP);
             }
         }
-        else if(c_type == HIPBLAS_R_32F && d_type == HIPBLAS_R_32F)
+        else if(c_type == HIPBLASLT_R_32F && d_type == HIPBLASLT_R_32F)
         {
             if(compute_type == rocblaslt_compute_f32)
             {
@@ -801,9 +801,9 @@ inline rocblaslt_status
             }
         }
     }
-    else if(a_type == HIPBLAS_R_16B && b_type == HIPBLAS_R_16B)
+    else if(a_type == HIPBLASLT_R_16B && b_type == HIPBLASLT_R_16B)
     {
-        if(c_type == HIPBLAS_R_16B && d_type == HIPBLAS_R_16B)
+        if(c_type == HIPBLASLT_R_16B && d_type == HIPBLASLT_R_16B)
         {
             if(compute_type == rocblaslt_compute_f32)
             {
