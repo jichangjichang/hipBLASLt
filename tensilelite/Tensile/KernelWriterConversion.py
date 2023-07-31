@@ -92,6 +92,12 @@ class KernelWriterConversion(KernelWriterBase):
         biasPtrStr = self.state["ProblemType"]["BiasDataType"].toDevice(self.language)
         kStr += "  " + biasPtrStr + "* " + "Bias;" + self.endLine
 
+    # ScaleAB
+    if self.state["ProblemType"]["UseScaleAB"]:
+      scalePtrStr = self.state["ProblemType"]["ComputeDataType"].toDevice(self.language)
+      kStr += "  " + scalePtrStr + " * " + "ScaleA;" + self.endLine
+      kStr += "  " + scalePtrStr + " * " + "ScaleB;" + self.endLine
+
     # interface: ScaleDVec GSU>1 GSUA "MUL"
     if self.state["ProblemType"]["UseScaleDVec"]:
       scaleDVecPtrStr = self.state["ProblemType"]["ComputeDataType"].toDevice(self.language)
@@ -363,6 +369,12 @@ class KernelWriterConversion(KernelWriterBase):
     kStr += "  " + intermediateDataType + " accum[NUM_ELEMENT_LOAD] = {0};" + self.endLine
     kStr += "  " + destTypeStr + " result[NUM_ELEMENT_LOAD];" + self.endLine
 
+    #Load scaleAB
+    if self.state["ProblemType"]["UseScaleAB"]:
+      kStr += "  " + intermediateDataType + " scaleA_data, scaleB_data;" + self.endLine
+      kStr += "  " + "scaleA_data = *(arg.ScaleA);" + self.endLine
+      kStr += "  " + "scaleB_data = *(arg.ScaleB);" + self.endLine
+
     #TODO: workspace type is half precision
     if self.state["ProblemType"]["UseBias"] and self.state["ProblemType"]["Gradient"] and self.state["ProblemType"]["BiasSrc"] == "D":
       kStr += "  auto idxW_ori = idxW;%s"%self.endLine
@@ -419,6 +431,11 @@ class KernelWriterConversion(KernelWriterBase):
 
     accumStr = "accum"
     resultStr = "result"
+
+    #scaleAB
+    if self.state["ProblemType"]["UseScaleAB"]:
+      kStr += "  arg.alpha = arg.alpha*scaleA_data*scaleB_data;%s" % (self.endLine)
+    kStr += self.endLine
 
     #alpha
     for vIdx in range(self.num_dword_load):
@@ -540,7 +557,8 @@ class KernelWriterConversion(KernelWriterBase):
       name += "" if self.state["ProblemType"]["StridedBatched"] else "_GB"
     if self.state["ProblemType"]["UseBias"]:
       if self.state["ProblemType"]["Gradient"]:
-        name += "_DBias%s%s"%(self.state["ProblemType"]["BiasSrc"], self.state["ProblemType"]["BiasDataType"].toChar())
+        name += "_DBias%s"%(self.state["ProblemType"]["BiasDataType"].toChar())
+        name += "_BiasSrc%s"%(self.state["ProblemType"]["BiasSrc"])
       else:
         name += "_Bias%s"%self.state["ProblemType"]["BiasDataType"].toChar()
     if self.state["ProblemType"]["UseE"]:
@@ -556,6 +574,7 @@ class KernelWriterConversion(KernelWriterBase):
         name += "_%s"%str(self.state["ProblemType"]["ActivationType"]).upper()
       name += ("h" if self.state["ProblemType"]["ActivationHPA"] else "")
       name += ("ng" if self.state["ProblemType"]["ActivationNoGuard"] else "")
+    name += "_ScaleAB" if self.state["ProblemType"]["UseScaleAB"] else ""
     name += "_ScaleDVec" if self.state["ProblemType"]["UseScaleDVec"] else ""
     name += "_PostGSU" + str(self.state["GlobalSplitU"])
     if self.num_elements_load != None:

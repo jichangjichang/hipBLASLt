@@ -48,7 +48,7 @@
  * RocblasltContractionProblem captures the arguments for a GEMM-like *
  * contraction problem, to be passed to runContractionProblem.      *
  ********************************************************************/
-template <typename Ti, typename To = Ti, typename Tc = To>
+template <typename TiA, typename TiB = TiA, typename To = TiB, typename Tc = To>
 struct RocblasltContractionProblem
 {
     hipblasOperation_t trans_a;
@@ -64,17 +64,17 @@ struct RocblasltContractionProblem
 
     const Tc* alpha;
 
-    const Ti*        A;
-    const Ti* const* batch_A;
-    size_t           row_stride_a;
-    size_t           col_stride_a;
-    size_t           batch_stride_a;
+    const TiA*        A;
+    const TiA* const* batch_A;
+    size_t            row_stride_a;
+    size_t            col_stride_a;
+    size_t            batch_stride_a;
 
-    const Ti*        B;
-    const Ti* const* batch_B;
-    size_t           row_stride_b;
-    size_t           col_stride_b;
-    size_t           batch_stride_b;
+    const TiB*        B;
+    const TiB* const* batch_B;
+    size_t            row_stride_b;
+    size_t            col_stride_b;
+    size_t            batch_stride_b;
 
     const Tc* beta;
 
@@ -103,12 +103,14 @@ struct RocblasltContractionProblem
 
     rocblaslt_compute_type compute_type;
 
-    const void*        bias;
-    const Tc*          scaleDVec;
-    hipblasltDatatype_t  bias_type;
-    rocblaslt_epilogue epilogue;
-    void*              workspace;
-    size_t             workspaceSize;
+    const void*         bias;
+    const Tc*           scaleA;
+    const Tc*           scaleB;
+    const Tc*           scaleDVec;
+    hipblasltDatatype_t bias_type;
+    rocblaslt_epilogue  epilogue;
+    void*               workspace;
+    size_t              workspaceSize;
 
     hipStream_t stream;
 
@@ -120,12 +122,12 @@ struct RocblasltContractionProblem
                                 int64_t                n,
                                 int64_t                k,
                                 const Tc*              alpha,
-                                const Ti*              A,
-                                const Ti* const*       batch_A,
+                                const TiA*             A,
+                                const TiA* const*      batch_A,
                                 int64_t                ld_a,
                                 int64_t                batch_stride_a,
-                                const Ti*              B,
-                                const Ti* const*       batch_B,
+                                const TiB*             B,
+                                const TiB* const*      batch_B,
                                 int64_t                ld_b,
                                 int64_t                batch_stride_b,
                                 const Tc*              beta,
@@ -147,8 +149,10 @@ struct RocblasltContractionProblem
                                 bool                   gradient,
                                 rocblaslt_compute_type compute_type,
                                 const void*            bias,
+                                const Tc*              scaleA,
+                                const Tc*              scaleB,
                                 const Tc*              scaleDVec,
-                                hipblasltDatatype_t      bias_type,
+                                hipblasltDatatype_t    bias_type,
                                 rocblaslt_epilogue     epilogue,
                                 void*                  workspace,
                                 size_t                 workspaceSize,
@@ -191,6 +195,8 @@ struct RocblasltContractionProblem
         , gradient(gradient)
         , compute_type(compute_type)
         , bias(bias)
+        , scaleA(scaleA)
+        , scaleB(scaleB)
         , scaleDVec(scaleDVec)
         , bias_type(bias_type)
         , epilogue(epilogue)
@@ -205,10 +211,10 @@ void initTensileGemmData(rocblaslt_handle       handle,
                          rocblaslt::RocGemmType gemmType,
                          hipblasOperation_t     opA,
                          hipblasOperation_t     opB,
-                         hipblasltDatatype_t      typeA,
-                         hipblasltDatatype_t      typeB,
-                         hipblasltDatatype_t      typeC,
-                         hipblasltDatatype_t      typeD,
+                         hipblasltDatatype_t    typeA,
+                         hipblasltDatatype_t    typeB,
+                         hipblasltDatatype_t    typeC,
+                         hipblasltDatatype_t    typeD,
                          rocblaslt_compute_type typeCompute,
                          size_t                 maxWorkspaceBytes,
                          std::shared_ptr<void>& gemmData);
@@ -216,21 +222,22 @@ void initTensileGemmData(rocblaslt_handle       handle,
 /*******************************************************************************
  * runContractionProblem() solves a RocblasltContractionProblem *
  *******************************************************************************/
-template <typename Ti, typename To, typename Tc>
-rocblaslt_status runContractionProblem(rocblaslt_handle                               handle,
-                                       const rocblaslt_matmul_algo*                   algo,
-                                       RocblasltContractionProblem<Ti, To, Tc> const& problem,
-                                       std::shared_ptr<void>                          gemmData);
+template <typename TiA, typename TiB, typename To, typename Tc>
+rocblaslt_status runContractionProblem(rocblaslt_handle                                     handle,
+                                       const rocblaslt_matmul_algo*                         algo,
+                                       RocblasltContractionProblem<TiA, TiB, To, Tc> const& problem,
+                                       std::shared_ptr<void> gemmData);
 
-template <typename Ti, typename To, typename Tc>
-rocblaslt_status gemmCreate(RocblasltContractionProblem<Ti, To, Tc> const& problem,
-                            std::shared_ptr<void>&                         gemmData,
-                            size_t&                                        gemmCount);
+template <typename TiA, typename TiB, typename To, typename Tc>
+rocblaslt_status gemmCreate(RocblasltContractionProblem<TiA, TiB, To, Tc> const& problem,
+                            std::shared_ptr<void>&                               gemmData,
+                            size_t&                                              gemmCount);
 
-template <typename Ti, typename To, typename Tc>
-rocblaslt_status groupedGemmCreate(std::vector<RocblasltContractionProblem<Ti, To, Tc>>& probs,
-                                   std::shared_ptr<void>&                                gemmData,
-                                   size_t&                                               gemmCount);
+template <typename TiA, typename TiB, typename To, typename Tc>
+rocblaslt_status
+    groupedGemmCreate(std::vector<RocblasltContractionProblem<TiA, TiB, To, Tc>>& probs,
+                      std::shared_ptr<void>&                                      gemmData,
+                      size_t&                                                     gemmCount);
 
 rocblaslt_status makeArgument(rocblaslt_handle             handle,
                               const rocblaslt::RocGemmType gemmType,
@@ -260,15 +267,15 @@ inline bool& rocblaslt_suppress_tensile_error_messages()
     return t_suppress;
 }
 
-template <typename Ti, typename To = Ti, typename Tc = To>
-rocblaslt_status getAllSolutions(RocblasltContractionProblem<Ti, To, Tc>&        prob,
+template <typename TiA, typename TiB = TiA, typename To = TiB, typename Tc = To>
+rocblaslt_status getAllSolutions(RocblasltContractionProblem<TiA, TiB, To, Tc>&  prob,
                                  rocblaslt_handle                                handle,
                                  std::vector<rocblaslt_matmul_heuristic_result>& heuristicResults,
                                  size_t                                          maxWorkSpaceBytes);
 
-template <typename Ti, typename To = Ti, typename Tc = To>
-rocblaslt_status getAllSolutions(std::vector<RocblasltContractionProblem<Ti, To, Tc>>& probs,
-                                 rocblaslt_handle                                      handle,
+template <typename TiA, typename TiB = TiA, typename To = TiB, typename Tc = To>
+rocblaslt_status getAllSolutions(std::vector<RocblasltContractionProblem<TiA, TiB, To, Tc>>& probs,
+                                 rocblaslt_handle                                            handle,
                                  std::vector<rocblaslt_matmul_heuristic_result>& heuristicResults,
                                  size_t                                          maxWorkSpaceBytes);
 
@@ -278,12 +285,12 @@ rocblaslt_status
                           std::vector<rocblaslt_matmul_heuristic_result>& heuristicResults,
                           size_t                                          maxWorkSpaceBytes);
 
-template <typename Ti, typename To = Ti, typename Tc = To>
-rocblaslt_status isSolutionSupported(rocblaslt_handle                         handle,
-                                     RocblasltContractionProblem<Ti, To, Tc>& prob,
-                                     std::shared_ptr<void>                    gemmData,
-                                     rocblaslt_matmul_algo*                   algo,
-                                     size_t*                                  workspaceSizeInBytes);
+template <typename TiA, typename TiB = TiA, typename To = TiB, typename Tc = To>
+rocblaslt_status isSolutionSupported(rocblaslt_handle                               handle,
+                                     RocblasltContractionProblem<TiA, TiB, To, Tc>& prob,
+                                     std::shared_ptr<void>                          gemmData,
+                                     rocblaslt_matmul_algo*                         algo,
+                                     size_t* workspaceSizeInBytes);
 
 rocblaslt_status isSolutionSupported(rocblaslt_handle              handle,
                                      const rocblaslt::RocGemmType& gemmType,
@@ -295,14 +302,14 @@ rocblaslt_status isSolutionSupported(rocblaslt_handle              handle,
  * getBestSolutions() calls finTopSolutions from Tensile and converts to       *
  * rocblaslt_matmul_heuristic_result                                           *
  *******************************************************************************/
-template <typename Ti, typename To = Ti, typename Tc = To>
-rocblaslt_status getBestSolutions(RocblasltContractionProblem<Ti, To, Tc> prob,
-                                  rocblaslt_handle                        handle,
-                                  std::shared_ptr<void>                   gemmData,
-                                  int                                     requestedAlgoCount,
-                                  rocblaslt_matmul_heuristic_result       heuristicResultsArray[],
-                                  int*                                    returnAlgoCount,
-                                  size_t                                  maxWorkSpaceBytes);
+template <typename TiA, typename TiB = TiA, typename To = TiB, typename Tc = To>
+rocblaslt_status getBestSolutions(RocblasltContractionProblem<TiA, TiB, To, Tc> prob,
+                                  rocblaslt_handle                              handle,
+                                  std::shared_ptr<void>                         gemmData,
+                                  int                                           requestedAlgoCount,
+                                  rocblaslt_matmul_heuristic_result heuristicResultsArray[],
+                                  int*                              returnAlgoCount,
+                                  size_t                            maxWorkSpaceBytes);
 
 rocblaslt_status getBestSolutions(rocblaslt_handle       handle,
                                   rocblaslt::RocGemmType gemmType,

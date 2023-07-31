@@ -65,7 +65,7 @@ class BoundIndex:
 
 class ProblemType:
     StateKeys = ['operationIdentifier', 'transA', 'transB', 'aType', 'bType', 'cType', 'dType', 'eType', 'computeType',
-                 'useBeta', 'useBias', 'biasSrcWhiteList', 'useE', 'useScaleDVec', 'biasDataTypeWhiteList', 'highPrecisionAccumulate',
+                 'useBeta', 'useBias', 'biasSrcWhiteList', 'useE', 'useScaleAB', 'useScaleDVec', 'biasDataTypeWhiteList', 'highPrecisionAccumulate',
                  'useInitialStridesAB', 'useInitialStridesCD', 'stridedBatched', 'groupedGemm',
                  'useGradient', 'activationType', 'activationHPA', 'activationNoGuard', 'sparseA', 'f32XdlMathOp', 'supportDeviceUserArguments']
     @classmethod
@@ -130,6 +130,14 @@ class ProblemType:
         rv.transB = bool(d['TransposeB'])
         rv.aType = srcType
         rv.bType = srcType
+        # for hybrid 8bit float types, we need to split the type into a_type and b_type
+        if srcType.isFloat8BFloat8():
+            rv.aType = DataType("F8")
+            rv.bType = DataType("B8")
+        elif srcType.isBFloat8Float8():
+            rv.aType = DataType("B8")
+            rv.bType = DataType("F8")
+
         rv.cType = dstType
         rv.dType = dstType
         rv.eType = computeType
@@ -192,6 +200,10 @@ class ProblemType:
         rv.useGradient = False
         if 'Gradient' in d:
             rv.useGradient = d["Gradient"]
+
+        rv.useScaleAB = False
+        if 'UseScaleAB' in d:
+            rv.useScaleAB = d['UseScaleAB']
 
         rv.useScaleDVec = False
         if 'UseScaleDVec' in d:
@@ -331,6 +343,7 @@ class ProblemType:
             predicates.append(ProblemPredicate("UseE", value=self.useE))
             predicates.append(ProblemPredicate("StridedBatched", value=self.stridedBatched))
             predicates.append(ProblemPredicate("GroupedGemm", value=self.groupedGemm))
+            predicates.append(ProblemPredicate("UseScaleAB", value=self.useScaleAB))
             predicates.append(ProblemPredicate("UseScaleDVec", value=self.useScaleDVec))
             predicates.append(ProblemPredicate("SparseA", value=self.sparseA))
             predicates.append(ProblemPredicate("F32XdlMathOp", value=self.f32XdlMathOp))

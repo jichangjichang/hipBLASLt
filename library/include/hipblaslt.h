@@ -131,9 +131,11 @@ typedef enum {
   HIPBLASLT_MATMUL_DESC_EPILOGUE = 2,                   /**<Epilogue function. See hipblasLtEpilogue_t. Default value is: HIPBLASLT_EPILOGUE_DEFAULT. Data Type: uint32_t*/
   HIPBLASLT_MATMUL_DESC_BIAS_POINTER = 3,               /**<Bias or Bias gradient vector pointer in the device memory. Data Type:void* /const void* */
   HIPBLASLT_MATMUL_DESC_BIAS_DATA_TYPE = 4,             /**<Type of the bias vector in the device memory. Can be set same as D matrix type or Scale type. Bias case: see HIPBLASLT_EPILOGUE_BIAS. Data Type:int32_t based on hipblasltDatatype_t*/
-  HIPBLASLT_MATMUL_DESC_EPILOGUE_AUX_POINTER = 6,       /**<Epilogue auxiliary buffer pointer in the device memory. Data Type:void* /const void* */
-  HIPBLASLT_MATMUL_DESC_EPILOGUE_AUX_LD = 7,            /**<The leading dimension of the epilogue auxiliary buffer pointer in the device memory. Data Type:int64_t */
-  HIPBLASLT_MATMUL_DESC_EPILOGUE_AUX_BATCH_STRIDE = 8,  /**<The batch stride of the epilogue auxiliary buffer pointer in the device memory. Data Type:int64_t */
+  HIPBLASLT_MATMUL_DESC_A_SCALE_POINTER = 5,            /**<Device pointer to the scale factor value that converts data in matrix A to the compute data type range. The scaling factor must have the same type as the compute type. If not specified, or set to NULL, the scaling factor is assumed to be 1. If set for an unsupported matrix data, scale, and compute type combination, calling hipblasLtMatmul() will return HIPBLAS_INVALID_VALUE. Default value: NULL Data Type: void* /const void* */
+  HIPBLASLT_MATMUL_DESC_B_SCALE_POINTER = 6,            /**<Equivalent to HIPBLASLT_MATMUL_DESC_A_SCALE_POINTER for matrix B. Default value: NULL Type: void* /const void* */
+  HIPBLASLT_MATMUL_DESC_EPILOGUE_AUX_POINTER = 7,       /**<Epilogue auxiliary buffer pointer in the device memory. Data Type:void* /const void* */
+  HIPBLASLT_MATMUL_DESC_EPILOGUE_AUX_LD = 8,            /**<The leading dimension of the epilogue auxiliary buffer pointer in the device memory. Data Type:int64_t */
+  HIPBLASLT_MATMUL_DESC_EPILOGUE_AUX_BATCH_STRIDE = 9,  /**<The batch stride of the epilogue auxiliary buffer pointer in the device memory. Data Type:int64_t */
   HIPBLASLT_MATMUL_DESC_D_SCALE_VECTOR_POINTER = 100,   /**<D scale vector length must match matrix D rows. It must match Scale data type. D scale vector is broadcast to all columns and multipied after final postprocssion. Data Type: void* /const void* */
   HIPBLASLT_MATMUL_DESC_MAX = 101
 } hipblasLtMatmulDescAttributes_t;
@@ -317,7 +319,7 @@ hipblasStatus_t hipblasLtDestroy(const hipblasLtHandle_t handle);
  */
 HIPBLASLT_EXPORT
 hipblasStatus_t hipblasLtMatrixLayoutCreate(hipblasLtMatrixLayout_t* matLayout,
-                                            hipblasltDatatype_t        type,
+                                            hipblasltDatatype_t      type,
                                             uint64_t                 rows,
                                             uint64_t                 cols,
                                             int64_t                  ld);
@@ -427,7 +429,7 @@ hipblasStatus_t hipblasLtMatrixLayoutGetAttribute(hipblasLtMatrixLayout_t       
 HIPBLASLT_EXPORT
 hipblasStatus_t hipblasLtMatmulDescCreate(hipblasLtMatmulDesc_t* matmulDesc,
                                           hipblasLtComputeType_t computeType,
-                                          hipblasltDatatype_t      scaleType);
+                                          hipblasltDatatype_t    scaleType);
 
 /*! \ingroup library_module
  *  \brief Destory a matrix multiply descriptor

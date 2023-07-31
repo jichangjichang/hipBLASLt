@@ -158,8 +158,10 @@ namespace Tensile
             D         = 3,
             E         = 4,
             BIAS      = 5,
-            SCALEDVEC = 6,
-            METADATA  = 7,
+            SCALEA    = 6,
+            SCALEB    = 7,
+            SCALEDVEC = 8,
+            METADATA  = 9,
             TENSOR_COUNT
         };
 
@@ -390,6 +392,8 @@ namespace Tensile
                                TensorDescriptor const& d,
                                TensorDescriptor const& e,
                                TensorDescriptor const& bias,
+                               TensorDescriptor const& scaleA,
+                               TensorDescriptor const& scaleB,
                                TensorDescriptor const& scaleDVec,
                                FreeIndices const&      freeIndices,
                                BatchIndices const&     batchIndices,
@@ -501,6 +505,11 @@ namespace Tensile
             m_useBias = useBias;
         }
 
+        void setUseScaleAB(bool useScaleAB)
+        {
+            m_useScaleAB = useScaleAB;
+        }
+
         void setUseScaleDVec(bool useScaleDVec)
         {
             m_useScaleDVec = useScaleDVec;
@@ -514,6 +523,11 @@ namespace Tensile
         bool useBias() const
         {
             return m_useBias;
+        }
+
+        bool useScaleAB() const
+        {
+            return m_useScaleAB;
         }
 
         bool useScaleDVec() const
@@ -558,6 +572,26 @@ namespace Tensile
         ContractionProblemGemm::TENSOR biasSrc() const
         {
             return m_biasSrc;
+        }
+
+        void setScaleA(DataType type)
+        {
+            m_scaleAType = type;
+            if(type != DataType::None && m_useScaleAB)
+            {
+                m_tensors[ContractionProblemGemm::TENSOR::SCALEA]
+                    = {"scaleA", m_scaleAType, {1}, {1, 1}};
+            }
+        }
+
+        void setScaleB(DataType type)
+        {
+            m_scaleBType = type;
+            if(type != DataType::None && m_useScaleAB)
+            {
+                m_tensors[ContractionProblemGemm::TENSOR::SCALEB]
+                    = {"scaleB", m_scaleBType, {1}, {1, 1}};
+            }
         }
 
         void setScaleDVec(DataType type, size_t length)
@@ -898,6 +932,7 @@ namespace Tensile
         bool           m_useGradient             = false;
         bool           m_useE                    = false;
         bool           m_useBias                 = false;
+        bool           m_useScaleAB              = false;
         bool           m_useScaleDVec            = false;
         ActivationType m_activationType          = ActivationType::None;
         ActivationType m_activationEnumArg       = ActivationType::None;
@@ -911,6 +946,8 @@ namespace Tensile
         DataType m_alphaType     = DataType::None; // if not assigned, will follow d-type
         DataType m_betaType      = DataType::None; // for bwd-compatible
         DataType m_biasType      = DataType::None;
+        DataType m_scaleAType    = DataType::None; // if not assigned, will follow alpha-type
+        DataType m_scaleBType    = DataType::None; // if not assigned, will follow alpha-type
         DataType m_scaleDVecType = DataType::None; // if not assigned, will follow alpha-type
 
         ContractionProblemGemm::TENSOR m_biasSrc = ContractionProblemGemm::TENSOR::D;
@@ -988,6 +1025,8 @@ namespace Tensile
                           void const* const*   _batchC,
                           void* const*         _batchD,
                           void const*          _bias,
+                          void const*          _scaleA,
+                          void const*          _scaleB,
                           void const*          _scaleDVec,
                           void*                _ws,
                           unsigned char const* _metadata);
@@ -1005,6 +1044,8 @@ namespace Tensile
         void* const*       batchD = nullptr;
 
         void const* bias      = nullptr;
+        void const* scaleA    = nullptr;
+        void const* scaleB    = nullptr;
         void const* scaleDVec = nullptr;
 
         // Constants

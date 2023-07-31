@@ -103,6 +103,7 @@ namespace Tensile
                     Base::template Pair<Predicates::Contraction::ActivationEnumWhiteList>(),
                     Base::template Pair<Predicates::Contraction::UseBiasEqual>(),
                     Base::template Pair<Predicates::Contraction::UseEEqual>(),
+                    Base::template Pair<Predicates::Contraction::UseScaleABEqual>(),
                     Base::template Pair<Predicates::Contraction::UseScaleDVecEqual>(),
                     Base::template Pair<Predicates::Contraction::BiasDataTypeWhiteList>(),
                     Base::template Pair<Predicates::Contraction::BiasSrcWhiteList>(),
@@ -413,6 +414,12 @@ namespace Tensile
         template <typename IO>
         struct MappingTraits<Predicates::Contraction::UseEEqual, IO>
             : public AutoMappingTraits<Predicates::Contraction::UseEEqual, IO>
+        {
+        };
+
+        template <typename IO>
+        struct MappingTraits<Predicates::Contraction::UseScaleABEqual, IO>
+            : public AutoMappingTraits<Predicates::Contraction::UseScaleABEqual, IO>
         {
         };
 

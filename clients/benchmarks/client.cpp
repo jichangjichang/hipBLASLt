@@ -68,7 +68,8 @@ void run_function(const func_map& map, const Arguments& arg, const std::string& 
     auto match = map.find(arg.function);
     if(match == map.end())
         throw std::invalid_argument("Invalid combination --function "s + arg.function
-                                    + " --a_type "s + hipblas_datatype_to_string(arg.a_type) + msg);
+                                    + " --a_type "s + hipblaslt_datatype_to_string(arg.a_type)
+                                    + msg);
     match->second(arg);
 }
 
@@ -500,23 +501,23 @@ try
     // validate arguments
 
     std::transform(precision.begin(), precision.end(), precision.begin(), ::tolower);
-    auto prec = string_to_hipblas_datatype(precision);
+    auto prec = string_to_hipblaslt_datatype(precision);
     if(prec == static_cast<hipblasltDatatype_t>(0))
         throw std::invalid_argument("Invalid value for --precision " + precision);
 
-    arg.a_type = a_type == "" ? prec : string_to_hipblas_datatype(a_type);
+    arg.a_type = a_type == "" ? prec : string_to_hipblaslt_datatype(a_type);
     if(arg.a_type == static_cast<hipblasltDatatype_t>(0))
         throw std::invalid_argument("Invalid value for --a_type " + a_type);
 
-    arg.b_type = b_type == "" ? prec : string_to_hipblas_datatype(b_type);
+    arg.b_type = b_type == "" ? prec : string_to_hipblaslt_datatype(b_type);
     if(arg.b_type == static_cast<hipblasltDatatype_t>(0))
         throw std::invalid_argument("Invalid value for --b_type " + b_type);
 
-    arg.c_type = c_type == "" ? prec : string_to_hipblas_datatype(c_type);
+    arg.c_type = c_type == "" ? prec : string_to_hipblaslt_datatype(c_type);
     if(arg.c_type == static_cast<hipblasltDatatype_t>(0))
         throw std::invalid_argument("Invalid value for --c_type " + c_type);
 
-    arg.d_type = d_type == "" ? prec : string_to_hipblas_datatype(d_type);
+    arg.d_type = d_type == "" ? prec : string_to_hipblaslt_datatype(d_type);
     if(arg.d_type == static_cast<hipblasltDatatype_t>(0))
         throw std::invalid_argument("Invalid value for --d_type " + d_type);
 
@@ -527,11 +528,11 @@ try
     if(arg.compute_type == static_cast<hipblasLtComputeType_t>(0))
         throw std::invalid_argument("Invalid value for --compute_type " + compute_type);
 
-    if(string_to_hipblas_datatype(bias_type) == static_cast<hipblasltDatatype_t>(0) && bias_type != ""
-       && bias_type != "default")
+    if(string_to_hipblaslt_datatype(bias_type) == static_cast<hipblasltDatatype_t>(0)
+       && bias_type != "" && bias_type != "default")
         throw std::invalid_argument("Invalid value for --bias_type " + bias_type);
     else
-        arg.bias_type = string_to_hipblas_datatype(bias_type);
+        arg.bias_type = string_to_hipblaslt_datatype(bias_type);
 
     arg.initialization = string2hipblaslt_initialization(initialization);
     if(arg.initialization == static_cast<hipblaslt_initialization>(0))

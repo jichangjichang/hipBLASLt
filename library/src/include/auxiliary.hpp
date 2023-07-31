@@ -92,7 +92,7 @@ constexpr hipblasOperation_t char_to_hipblas_operation(char value)
 
 // return precision string for hipblasltDatatype_t
 HIPBLASLT_EXPORT
-constexpr const char* hipblas_datatype_to_string(hipblasltDatatype_t type)
+constexpr const char* hipblaslt_datatype_to_string(hipblasltDatatype_t type)
 {
     switch(type)
     {
@@ -104,6 +104,10 @@ constexpr const char* hipblas_datatype_to_string(hipblasltDatatype_t type)
         return "bf16_r";
     case HIPBLASLT_R_8I:
         return "i8_r";
+    case HIPBLASLT_R_8F_E4M3:
+        return "f8_r";
+    case HIPBLASLT_R_8F_E5M2:
+        return "bf8_r";
     default:
         return "non-supported type";
     }
@@ -126,12 +130,14 @@ constexpr const char* hipblaslt_computetype_to_string(hipblasLtComputeType_t typ
 
 // clang-format off
 HIPBLASLT_EXPORT
-constexpr hipblasltDatatype_t string_to_hipblas_datatype(const std::string& value)
+constexpr hipblasltDatatype_t string_to_hipblaslt_datatype(const std::string& value)
 {
     return
         value == "f32_r" || value == "s" ? HIPBLASLT_R_32F  :
         value == "f16_r" || value == "h" ? HIPBLASLT_R_16F  :
         value == "bf16_r"                ? HIPBLASLT_R_16B  :
+        value == "f8_r"                ? HIPBLASLT_R_8F_E4M3  :
+        value == "bf8_r"                ? HIPBLASLT_R_8F_E5M2  :
         static_cast<hipblasltDatatype_t>(0);
 }
 

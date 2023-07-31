@@ -22,11 +22,12 @@
 # ########################################################################
 
 add_executable( example_hipblaslt_preference example_hipblaslt_preference.cpp)
+add_executable( example_hipblaslt_fp8bf8 example_hipblaslt_fp8bf8.cpp)
 add_executable( example_hipblaslt_groupedgemm example_hipblaslt_groupedgemm.cpp)
 add_executable( example_hipblaslt_groupedgemm_get_all_algos example_hipblaslt_groupedgemm_get_all_algos.cpp)
 add_executable( example_hipblaslt_algo_index example_hipblaslt_algo_index.cpp)
 
-set( sample_list_all example_hipblaslt_preference example_hipblaslt_groupedgemm example_hipblaslt_groupedgemm_get_all_algos example_hipblaslt_algo_index)
+set( sample_list_all example_hipblaslt_preference example_hipblaslt_fp8bf8 example_hipblaslt_groupedgemm example_hipblaslt_groupedgemm_get_all_algos example_hipblaslt_algo_index)
 
 set( sample_list_hip_device ${sample_list_all} )
 

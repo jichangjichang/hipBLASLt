@@ -110,7 +110,10 @@ def main( config ):
     functions.append((scheduleName, problemType))
     functionNames.append("tensile_%s" % (problemType))
     problemSizes = ProblemSizesMock(exactLogic)
-    biasTypeArgs   = BiasTypeArgs(problemType, [problemType["DataType"]])
+    if len(problemType["BiasDataTypeList"]) > 0:
+      biasTypeArgs = BiasTypeArgs(problemType, [problemType["BiasDataTypeList"][0]])
+    else:
+      biasTypeArgs = ""
 
     activationEnums = [[{'Enum': 'relu'}]]
 
@@ -439,6 +442,8 @@ def dataInitParams(problemType):
     initAlpha = globalParameters['DataInitTypeAlpha']
     initBeta  = globalParameters['DataInitTypeBeta']
     initBias  = globalParameters['DataInitTypeBias']
+    initScaleA  = globalParameters['DataInitTypeScaleA']
+    initScaleB  = globalParameters['DataInitTypeScaleB']
     initScaleDVec  = globalParameters['DataInitTypeScaleDVec']
 
     if not problemType.useBeta:
@@ -455,6 +460,8 @@ def dataInitParams(problemType):
             ('init-alpha',        DataInitName(initAlpha).name),
             ('init-beta',         DataInitName(initBeta).name),
             ('init-bias',         DataInitName(initBias).name),
+            ('init-scaleA',         DataInitName(initScaleA).name),
+            ('init-scaleB',         DataInitName(initScaleB).name),
             ('init-scaleDVec',         DataInitName(initScaleDVec).name)]
 
 def boundsCheckName(mode):
@@ -505,6 +512,7 @@ def writeClientConfigIni(problemSizes, biasTypeArgs, activationArgs, problemType
         param('use-bias',   problemType.useBias)
         param('bias-source',   problemType.biasSrcWhiteList[0])
         param('use-e', problemType.useE)
+        param('use-scaleAB',   problemType.useScaleAB)
         param('use-scaleDVec',   problemType.useScaleDVec)
         if biasTypeArgs:
           for btype in biasTypeArgs.biasTypes:
