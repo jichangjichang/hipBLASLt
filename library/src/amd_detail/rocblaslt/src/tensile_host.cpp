@@ -1095,6 +1095,8 @@ struct TensileDataGemm
     Tensile::ContractionInputs             inputs;
     std::vector<Tensile::KernelInvocation> kernels;
     int                                    algoIndex = std::numeric_limits<int>::max();
+    std::shared_ptr<void>                  hipHostMemory;
+    size_t                                 hipHostMemorySize;
 };
 
 struct TensileDataGroupedGemm
@@ -1137,6 +1139,12 @@ void initTensileGemmData(rocblaslt_handle       handle,
                                             beta,
                                             false,
                                             maxWorkspaceBytes);
+        void* tmp = nullptr;
+        static_cast<void>(hipHostMalloc(&tmp, INTERNAL_HIPHOSTMEM_SIZE, 0));
+        data.hipHostMemory
+            = std::shared_ptr<void>(tmp, [](auto p) { static_cast<void>(hipFree(p)); });
+        data.hipHostMemorySize = INTERNAL_HIPHOSTMEM_SIZE;
+
         gemmData     = std::static_pointer_cast<void>(std::make_shared<TensileDataGemm>(data));
         return;
     }
@@ -1428,7 +1436,10 @@ rocblaslt_status makeArgument(rocblaslt_handle             handle,
             data->problem.setUseScaleAlphaVec(solution->problemType.useScaleAlphaVec);
             data->problem.setUseE(solution->problemType.useE);
             data->problem.setUseGradient(solution->problemType.useGradient);
-            data->kernels = solution->solve(data->problem, data->inputs, *hardware);
+            data->kernels = solution->solve(data->problem, data->inputs, *hardware,
+                                                           data->hipHostMemory.get(),
+                                                           data->hipHostMemorySize,
+                                                           stream);
             data->problem.setUseBias(useBias);
             data->problem.setActivationType(actType);
             data->problem.setUseScaleAlphaVec(useScaleAlphaVec);
@@ -2249,6 +2260,7 @@ rocblaslt_status getBestSolutions(rocblaslt_handle       handle,
     if(gemmType == rocblaslt::RocGemmType::ROCBLASLT_GEMM)
     {
         std::shared_ptr<TensileDataGemm> data = std::static_pointer_cast<TensileDataGemm>(gemmData);
+        data->problem.setWorkspaceSize(workspaceBytes);
         int                              fallbackSize = 0;
         auto                             solutions    = getSolutions(data->inputs,
                                       library,

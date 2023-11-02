@@ -1985,6 +1985,10 @@ namespace Tensile
 
         std::vector<KernelInvocation> rv;
         auto                          h_args = KernelArguments(debug);
+        if(hipHostMemory)
+        {
+            h_args.useExternalPointer(hipHostMemory, hipHostMemorySize);
+        }
         h_args.reserve(32768, 8192);
 
         if(sizeMapping.globalSplitU > 1 && sizeMapping.globalAccumulation != 2)

@@ -1499,7 +1499,7 @@ void testing_matmul(const Arguments& arg)
         }
     }
 
-    dWorkspace = new device_vector<unsigned char>(workspace_size, 1, HMM);
+    dWorkspace = new device_vector<unsigned char>(workspace_size+256, 1, HMM);
     CHECK_DEVICE_ALLOCATION(dWorkspace->memcheck());
 
     if(arg.use_user_args)
