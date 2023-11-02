@@ -757,10 +757,11 @@ namespace Tensile
         args.template append<uint32_t>("gsu", sizeMapping.globalSplitU);
     }
 
-    template <bool T_Debug>
+    template <bool T_Debug, typename KA>
     KernelInvocation
         ContractionSolution::generateSingleCall(ContractionSolution::Problem const& problem,
-                                                ContractionInputs const&            inputs) const
+                                                ContractionInputs const&            inputs,
+                                                KA&                 h_args) const
     {
         TENSILE_ASSERT_EXC(sizeMapping.workGroupMapping >= 0);
 
@@ -814,12 +815,16 @@ namespace Tensile
 
         rv.sharedMemBytes = 0;
 
-        singleCallArgs<T_Debug, true>(problem, inputs, 0, rv.args);
+        uint32_t workspaceOffsetInByte  = 256; //hard-code
+        //singleCallArgs<T_Debug, true>(problem, inputs, 0, rv.args);
+        singleCallArgs<T_Debug, true>(problem, inputs, workspaceOffsetInByte, h_args);
 
         if((sizeMapping.globalAccumulation == 2) && (sizeMapping.customKernelName != ""))
         {
             rv.args.append<uint32_t>("GSUSync", 0);
         }
+        //rv.args.append<uint32_t>("gsu", sizeMapping.globalSplitU);
+        rv.args.append<void const*>("argsPtr", (void*)inputs.ws);
 
         rv.codeObjectFile = codeObjectFilename.load();
 
@@ -1325,7 +1330,8 @@ namespace Tensile
         rv.numWorkItems.y = rv.workGroupSize.y * rv.numWorkGroups.y;
         rv.numWorkItems.z = rv.workGroupSize.z * rv.numWorkGroups.z;
 
-        outputConversionCallArgs<T_Debug>(problem, inputs, 0, rv.args);
+        //hard code shift workspace offset
+        outputConversionCallArgs<T_Debug>(problem, inputs, 256, rv.args);
 
         //@TODO determine if this is needed, may not end up in the same code object file
         rv.codeObjectFile = codeObjectFilename.load();
@@ -1850,7 +1856,9 @@ namespace Tensile
         if(auto gemmProblem = dynamic_cast<ContractionProblemGemm const*>(&problem))
         {
             auto gemmInputs = dynamic_cast<ContractionInputs const*>(&inputs);
-            return solve((*gemmProblem), (*gemmInputs), hardware);
+            //return solve((*gemmProblem), (*gemmInputs), hardware);
+            return solve(
+                (*gemmProblem), (*gemmInputs), hardware, hipHostMemory, hipHostMemorySize, stream);
         }
         else if(auto groupedProblem = dynamic_cast<ContractionProblemGroupedGemm const*>(&problem))
         {
@@ -1894,11 +1902,14 @@ namespace Tensile
             throw std::runtime_error("Failed to cast problem type.");
         }
     }
-
+    //modify this
     std::vector<KernelInvocation>
         ContractionSolution::solve(ContractionSolution::Problem const& problem,
                                    ContractionSolution::Inputs const&  inputs,
-                                   Hardware const&                     hardware) const
+                                   Hardware const&                     hardware, 
+                                                             void*       hipHostMemory,
+                                                             size_t      hipHostMemorySize,
+                                                             hipStream_t stream) const
     {
         if(Debug::Instance().printWinningKernelName())
             std::cout << "Running kernel: " << this->KernelName() << std::endl;
@@ -1973,6 +1984,8 @@ namespace Tensile
                 "ContractionProblemGemm has cEqualsD set, but pointers for c and d are not equal");
 
         std::vector<KernelInvocation> rv;
+        auto                          h_args = KernelArguments(debug);
+        h_args.reserve(32768, 8192);
 
         if(sizeMapping.globalSplitU > 1 && sizeMapping.globalAccumulation != 2)
         {
@@ -1983,9 +1996,9 @@ namespace Tensile
         }
 
         if(debug)
-            rv.push_back(generateSingleCall<true>(problem, inputs));
+            rv.push_back(generateSingleCall<true>(problem, inputs, h_args));
         else
-            rv.push_back(generateSingleCall<false>(problem, inputs));
+            rv.push_back(generateSingleCall<false>(problem, inputs, h_args));
 
         if((sizeMapping.customKernelName == "") && sizeMapping.globalAccumulation)
         {
@@ -2022,6 +2035,25 @@ namespace Tensile
                     rv.push_back(generateReductionCall<false>(problem, inputs));
             }
         }
+
+        if(debug)
+        {
+            std::cout << "Gemm argsPtr kernels: " << std::endl;
+            for(auto& kernel : rv)
+            {
+                std::cout << kernel.kernelName << std::endl;
+            }
+            std::cout << h_args;
+        }
+
+        if(hipHostMemory && hipHostMemorySize < h_args.size())
+            throw std::runtime_error("Insufficient host memory size.");
+
+        uint8_t*    d_args = (uint8_t*)inputs.ws;
+        const void* tmpMem = hipHostMemory ? hipHostMemory : h_args.data();
+        HIP_CHECK_EXC(hipMemcpyAsync(
+            d_args, tmpMem, h_args.size() * sizeof(uint8_t), hipMemcpyHostToDevice, stream));
+
 
         return rv;
     }

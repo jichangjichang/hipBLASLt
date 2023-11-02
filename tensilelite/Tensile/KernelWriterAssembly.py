@@ -1162,12 +1162,18 @@ class KernelWriterAssembly(KernelWriter):
           moduleArgs.addComment1("pad %u snops to satisfy 0x100 code size for Preload Backward Compatibility Prologue" % (64 - total_inst_dwords))
           for i in range(64 - total_inst_dwords):
             moduleArgs.add(SNop(waitState=0, comment=""))
-          #handle preload path started from code size 0x100
-          self.argLoader.resetOffset()
-          moduleArgs.addModuleAsFlatItems(self.argLoader.loadAllKernArg(sgprStart, "KernArgAddress", load, self.states.numSgprPreload))
+
           preloadSgprStartIdx = self.states.rpga  #number sgprs of kernel argument buffer address
-          for i in range(self.states.numSgprPreload):
-            moduleArgs.add(SMovB32(dst=sgpr(sgprStart+i), src=sgpr(preloadSgprStartIdx+i), comment="move preload data to correct sgpr"))
+          moduleArgs.add(SMovB32(dst=sgpr("KernArgAddress+1"), src=sgpr(preloadSgprStartIdx+1), comment="Load address of kernel arguments"))
+          moduleArgs.add(SMovB32(dst=sgpr("KernArgAddress"), src=sgpr(preloadSgprStartIdx), comment="Load address of kernel arguments"))
+          self.argLoader.resetOffset()
+          moduleArgs.addModuleAsFlatItems(self.argLoader.loadAllKernArg(sgprStart, "KernArgAddress", load, 0))
+          #handle preload path started from code size 0x100
+          #self.argLoader.resetOffset()
+          #moduleArgs.addModuleAsFlatItems(self.argLoader.loadAllKernArg(sgprStart, "KernArgAddress", load, self.states.numSgprPreload))
+          #preloadSgprStartIdx = self.states.rpga  #number sgprs of kernel argument buffer address
+          #for i in range(self.states.numSgprPreload):
+          #  moduleArgs.add(SMovB32(dst=sgpr(sgprStart+i), src=sgpr(preloadSgprStartIdx+i), comment="move preload data to correct sgpr"))
           for i in range(kernel["ProblemType"]["NumIndicesC"]):
             moduleRegInit.add(SMovB32(dst=sgpr("WorkGroup0+%u"%i), src=sgpr(preloadSgprStartIdx+self.states.numSgprPreload+i), \
                         comment="restore workgroup id"))

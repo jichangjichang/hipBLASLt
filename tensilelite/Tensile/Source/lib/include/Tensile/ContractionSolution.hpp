@@ -257,7 +257,10 @@ namespace Tensile
                                                     hipStream_t               stream) const;
 
         virtual std::vector<KernelInvocation>
-            solve(Problem const& problem, Inputs const& inputs, Hardware const& hardware) const;
+            solve(Problem const& problem, Inputs const& inputs, Hardware const& hardware,
+                                                             void*       hipHostMemory = nullptr,
+                                                             size_t      hipHostMemorySize = 0,
+                                                             hipStream_t stream = nullptr) const;
 
         virtual std::vector<KernelInvocation> solveGroupedGemm(std::vector<Problem> const& problems,
                                                                GroupedInputs const&        inputs,
@@ -314,9 +317,10 @@ namespace Tensile
                                                       Tensile::dim3&              numWorkItems,
                                                       KA&                         h_args) const;
 
-        template <bool T_Debug>
+        template <bool T_Debug, typename KA>
         KernelInvocation generateSingleCall(Problem const&           problem,
-                                            ContractionInputs const& inputs) const;
+                                            ContractionInputs const& inputs,
+                                                       KA&                         h_args) const;
 
         template <bool T_Debug, typename KA>
         KernelInvocation generateSingleCallGroupedGemm(std::vector<Problem> const& problems,
