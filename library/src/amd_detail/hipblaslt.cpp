@@ -87,6 +87,31 @@ hipblasStatus_t RocBlasLtStatusToHIPStatus(rocblaslt_status_ status)
     }
 }
 
+rocblaslt_compute_type HipBlasComputeTypeToRocBlasLtComputeType(hipblasComputeType_t type)
+{
+    switch(type)
+    {
+    case HIPBLAS_COMPUTE_16F:
+    case HIPBLAS_COMPUTE_16F_PEDANTIC:
+        throw HIPBLAS_STATUS_INVALID_ENUM;
+    case HIPBLAS_COMPUTE_32F:
+    case HIPBLAS_COMPUTE_32F_PEDANTIC:
+        return rocblaslt_compute_f32;
+    case HIPBLAS_COMPUTE_32F_FAST_16F:
+        return rocblaslt_compute_f32_fast_f16;
+    case HIPBLAS_COMPUTE_32F_FAST_16BF:
+        throw HIPBLAS_STATUS_INVALID_ENUM;
+    case HIPBLAS_COMPUTE_32F_FAST_TF32:
+        return rocblaslt_compute_f32_fast_xf32;
+    case HIPBLAS_COMPUTE_64F:
+    case HIPBLAS_COMPUTE_64F_PEDANTIC:
+        return rocblaslt_compute_f64;
+    case HIPBLAS_COMPUTE_32I:
+    case HIPBLAS_COMPUTE_32I_PEDANTIC:
+        return rocblaslt_compute_i32;
+    }
+}
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -176,7 +201,8 @@ hipblasStatus_t hipblasLtMatmulDescCreate(hipblasLtMatmulDesc_t* matmulDesc,
 try
 {
     return RocBlasLtStatusToHIPStatus(rocblaslt_matmul_desc_create(
-        (rocblaslt_matmul_desc*)matmulDesc, (rocblaslt_compute_type)computeType, scaleType));
+        (rocblaslt_matmul_desc*)matmulDesc,
+        HipBlasComputeTypeToRocBlasLtComputeType(computeType), scaleType));
 }
 catch(...)
 {

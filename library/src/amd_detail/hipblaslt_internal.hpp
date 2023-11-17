@@ -31,3 +31,5 @@
 hipblasStatus_t hipErrorToHIPBLASStatus(hipError_t status);
 
 hipblasStatus_t RocBlasLtStatusToHIPStatus(rocblaslt_status_ status);
+
+rocblaslt_compute_type HipBlasComputeTypeToRocBlasLtComputeType(hipblasComputeType_t type);

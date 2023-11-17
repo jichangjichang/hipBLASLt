@@ -148,7 +148,7 @@ namespace hipblaslt_ext
                                 typeB,
                                 typeC,
                                 typeD,
-                                (rocblaslt_compute_type)typeCompute,
+                                HipBlasComputeTypeToRocBlasLtComputeType(typeCompute),
                                 0,
                                 m_data);
     }
@@ -307,7 +307,7 @@ namespace hipblaslt_ext
                                 typeB,
                                 typeC,
                                 typeD,
-                                (rocblaslt_compute_type)typeCompute,
+                                HipBlasComputeTypeToRocBlasLtComputeType(typeCompute),
                                 0,
                                 m_data);
     }
@@ -550,7 +550,7 @@ namespace hipblaslt_ext
                                                typeB,
                                                typeC,
                                                typeD,
-                                               (rocblaslt_compute_type)typeCompute,
+                                               HipBlasComputeTypeToRocBlasLtComputeType(typeCompute),
                                                *results));
     }
     catch(...)
