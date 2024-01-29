@@ -662,8 +662,12 @@ class KernelWriterAssembly(KernelWriter):
 
     if not kernel["DirectToLdsA"] or self.do["KeepDirectToLdsAlloc"]:
         module.add(RegSet("v", "vgprG2LA", self.states.a.startVgprG2L))
+        if kernel["PrefetchGlobalRead"] == 3:
+          module.add(RegSet("v", "vgprG2LA_1", self.states.a.startVgprG2L_1))
     if not kernel["DirectToLdsB"] or self.do["KeepDirectToLdsAlloc"]:
         module.add(RegSet("v", "vgprG2LB", self.states.b.startVgprG2L))
+        if kernel["PrefetchGlobalRead"] == 3:
+          module.add(RegSet("v", "vgprG2LB_1", self.states.b.startVgprG2L_1))
     if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
         module.add(RegSet("v", "vgprG2LMetadata", self.states.m.startVgprG2L))
 
@@ -3692,7 +3696,7 @@ class KernelWriterAssembly(KernelWriter):
       if tP["isB"]:
         # Convert passed in S' to S for easy loop comparison.  S=S-(PGR-1)'
         imod.add(SAddU32(dst=sgpr("StaggerUIter"), src0=sgpr("StaggerUIter"), \
-                src1=(2 if kernel["PrefetchGlobalRead"] else 1), \
+                src1=(2 if kernel["PrefetchGlobalRead"] < 3 else 3 if kernel["PrefetchGlobalRead"] == 3 else 1), \
                 comment="Subtract (PGR-1); StaggerUIter now contains target iteration to wrap"))
     return imod
 
@@ -3954,11 +3958,11 @@ class KernelWriterAssembly(KernelWriter):
         endCounter =  0
       else:
         endCounter = 1
-    elif kernel["PrefetchGlobalRead"] == 2:
+    elif kernel["PrefetchGlobalRead"] >= 2:
       if kernel["SuppressNoLoadLoop"]:
         endCounter =  1
       else:
-        endCounter = 2
+        endCounter = kernel["PrefetchGlobalRead"]
     else:
       endCounter =  0
 
@@ -4004,24 +4008,26 @@ class KernelWriterAssembly(KernelWriter):
 
       if loopIdx == self.states.unrollIdx:
         # 1 loop check is necessary only when AssertSummationElementMultiple % (DepthU * 2) != 0
-        if kernel["PrefetchGlobalRead"] == 2 and kernel["AssertSummationElementMultiple"] % (kernel["DepthU"] * 2) != 0:
+        if kernel["PrefetchGlobalRead"] >= 2 and kernel["AssertSummationElementMultiple"] % (kernel["DepthU"] * 2) != 0:
           module.add(SCmpEQU32(
               src0=loopCounter, \
-              src1=hex(endCounter-1), \
+              src1=hex(1), \
               comment="LoopCounter%s < EndCounter"%(loopChar) ))
           toPGR1 = Label.getFormatting(self.labels.getName("toPGR1"))
-          module.add(SCBranchSCC1(labelName=toPGR1, comment="PGR=2 but only 1 loop, toPGR1"))
+          module.add(SCBranchSCC1(labelName=toPGR1, comment="PGR=%u but only 1 loop, toPGR1" % kernel["PrefetchGlobalRead"]))
 
         module.add(SCmpLeU32(
             src0=loopCounter, \
             src1=hex(endCounter), \
             comment="LoopCounter%s < EndCounter"%(loopChar) ))
-        jumpLabel = loopLabelEnd
+        jumpLabelName = loopLabelEnd.getLabelName()
         if kernel["PrefetchGlobalRead"]==2 and (not kernel["SuppressNoLoadLoop"]) and kernel["ExpandPointerSwap"]:
           # PGR=2 and EPS and no SuppressNoLoadLoop case, need to jump to EvenExit
-          jumpLabel = Label("LoopEnd%s_evenexit"%(loopChar), "" )
-        module.add(SCBranchSCC1(labelName=jumpLabel.getLabelName(), \
-                  comment="do not enter Loop%s"%loopChar ))
+          jumpLabelName = Label("LoopEnd%s_evenexit"%(loopChar), "" ).getLabelName
+        elif kernel["PrefetchGlobalRead"] == 3:
+          jumpLabelName = Label.getFormatting(self.labels.getName("toPGR2"))
+        module.add(SCBranchSCC1(labelName=jumpLabelName, \
+                  comment="do not enter Loop%s%s"% (loopChar, ", jump toPGR2" if kernel["PrefetchGlobalRead"] == 3 else "")))
 
       if not noLabelGen:
         module.add(loopLabelBegin)
@@ -4115,6 +4121,9 @@ class KernelWriterAssembly(KernelWriter):
         endCounter = 1
       elif kernel["PrefetchGlobalRead"] == 2 and not kernel["SuppressNoLoadLoop"] and loopIdx == self.states.unrollIdx:
         endCounter = 2
+      elif kernel["PrefetchGlobalRead"] == 3:
+        #If less than 3, go to PGR2 section (NGLL)
+        endCounter = 3
       else:
         endCounter = 0
 
@@ -4125,7 +4134,7 @@ class KernelWriterAssembly(KernelWriter):
         # No exit case, no code is necessary except for final Loop
 
         # decrement by 2 if PGR=2 and StaggerU is 0, else 1
-        decValue = 2 if kernel["PrefetchGlobalRead"]==2 and kernel["StaggerU"] == 0 else 1
+        decValue = 2 if kernel["PrefetchGlobalRead"]>=2 and kernel["StaggerU"] == 0 else 1
         decCode = SSubU32(dst=loopCounter, src0=loopCounter, \
             src1=decValue, \
             comment="dec counter%s"%(loopChar) )
@@ -4169,7 +4178,10 @@ class KernelWriterAssembly(KernelWriter):
     if not tailLoop and not kernel["SuppressNoLoadLoop"] and kernel["ExpandPointerSwap"]:
       # in this case, odd or/and even code is generated and use odd/even exit to avoid skipping odd/even code
       # (end label is generated after odd/even code)
-      jumpLabel = loopLabelEndOddExit if oddLabel else loopLabelEndEvenExit
+      if kernel["PrefetchGlobalRead"] != 3:
+        jumpLabel = loopLabelEndOddExit if oddLabel else loopLabelEndEvenExit
+      else:
+        jumpLabel = Label(self.labels.getName("toPGR2_1"), "")
     if not finalLoop:
       if nonFinalJumpNeeded:
         # just an exit check, else fall through to the next loop copy
@@ -4217,20 +4229,21 @@ class KernelWriterAssembly(KernelWriter):
         firstCode = evenIterCode
         secondPreCode = oddIterPreCode
         secondCode = oddIterCode
-        if oddLabel:
-          # oddLabel case, swap the order (odd -> even)
-          firstPreCode, secondPreCode = secondPreCode, firstPreCode
-          firstCode, secondCode = secondCode, firstCode
+        if kernel["PrefetchGlobalRead"] != 3: 
+          if oddLabel:
+            # oddLabel case, swap the order (odd -> even)
+            firstPreCode, secondPreCode = secondPreCode, firstPreCode
+            firstCode, secondCode = secondCode, firstCode
 
-        module.add(firstPreCode)
-        module.add(firstCode)
+          module.add(firstPreCode)
+          module.add(firstCode)
 
-        # if secondCode exist, add jump to skip secondCode
-        if secondCode.count():
-          module.add(SBranch(labelName=loopLabelEnd.getLabelName(), \
-                    comment="exit unroll loop%s (and skip second exit code)"%(loopChar)))
-        module.add(secondPreCode)
-        module.add(secondCode)
+          # if secondCode exist, add jump to skip secondCode
+          if secondCode.count():
+            module.add(SBranch(labelName=loopLabelEnd.getLabelName(), \
+                      comment="exit unroll loop%s (and skip second exit code)"%(loopChar)))
+          module.add(secondPreCode)
+          module.add(secondCode)
 
       module.add(loopLabelEnd)
 
@@ -5062,16 +5075,57 @@ class KernelWriterAssembly(KernelWriter):
     return module
 
   ##############################################################################
-  def closeSumAtLeastUnroll(self, kernel, tPA, tPB, prefetch, isOptNLL, isNGLL):
+  def closeSumAtLeastUnroll(self, kernel, tPA, tPB, prefetch, isOptNLL, isNGLL, loopIndex = 0):
     module = Module("closeSumAtLeastUnroll")
     if not prefetch:
       if isNGLL:
-        if kernel["ProblemType"]["Sparse"] and kernel["PrefetchGlobalRead"] == 2 and kernel["DirectToVgprSparseMetadata"]:
+        if kernel["ProblemType"]["Sparse"] and kernel["PrefetchGlobalRead"] >= 2 and kernel["DirectToVgprSparseMetadata"]:
           for i in range(0, self.states.m.numVgprValuPerBlock):
             module.add(VMovB32(vgpr("ValuMetadata+%u"%i), vgpr("ValuMetadata+%u+%u"%(self.states.m.numVgprValuPerBlock, i)), \
                                     "copy ValuMetadata blk1 to blk0"))
         toPGR1 = Label(self.labels.getName("toPGR1"), "")
-        module.add(toPGR1)
+        if kernel["PrefetchGlobalRead"] == 3:
+          loopChar = self.states.indexChars[kernel["ProblemType"]["IndicesSummation"][self.states.unrollIdx]]
+          loopCounter = self.loopCounter(kernel, self.states.unrollIdx)
+          loopLabelEndOddExit = Label("LoopEnd%s_oddexit"%(loopChar), " NGLL odditer exit" )
+          loopLabelEndEvenExit = Label("LoopEnd%s_evenexit"%(loopChar), "NGLL eveniter exit" )
+          module.add(SSubU32(
+              dst=loopCounter, src0=loopCounter, \
+              src1=1, \
+              comment="dec counter%s"%(loopChar) ))
+ 
+          module.add(SCmpEQI32(
+              src0=loopCounter, \
+              src1=hex(1), \
+              comment="counter%s==1"%(loopChar) ))
+
+          if not kernel["SuppressNoLoadLoop"] and kernel["ExpandPointerSwap"]:
+            if loopIndex == 0:
+              module.add(SCBranchSCC1(labelName=loopLabelEndOddExit.getLabelName(), comment="exit NGLL Loop%s"%loopChar ))
+            else:
+              module.add(SCBranchSCC1(labelName=loopLabelEndEvenExit.getLabelName(), comment="exit NGLL Loop%s"%loopChar ))
+          else:
+            module.add(SCBranchSCC1(labelName=toPGR1.getLabelName(), comment="exit NGLL Loop%s"%loopChar ))
+
+          if loopIndex == 1:
+            module.add(SCmpEQI32(
+                src0=loopCounter, \
+                src1=hex(2), \
+                comment="counter%s==2"%(loopChar) ))
+            toPGR2 = Label(self.labels.getName("toPGR2"), "")
+            module.add(SCBranchSCC1(labelName=toPGR2.getLabelName(), comment="goto first NGLL Loop%s"%loopChar ))
+        
+          if loopIndex == 1 and not kernel["SuppressNoLoadLoop"] and kernel["ExpandPointerSwap"]:
+            module.add(loopLabelEndEvenExit)
+            module.add(SBranch(labelName=toPGR1.getLabelName(), \
+                      comment="exit loop%s (and skip second exit code)"%(loopChar)))
+            module.add(loopLabelEndOddExit)
+            module.addComment1("Select high bank of LDS")
+            module.add(self.localReadSwapOffsets(kernel, False, tPA))
+            module.add(self.localReadSwapOffsets(kernel, False, tPB))
+        
+        if kernel["PrefetchGlobalRead"] != 3 or loopIndex == 1:
+          module.add(toPGR1)
       else:
         if isOptNLL:
             endSumLabel = "Summation_End_OptNLL"
@@ -5877,7 +5931,7 @@ class KernelWriterAssembly(KernelWriter):
 
     # else not-guardK below:
 
-    def globalReadBody(tP):
+    def globalReadBody(tP, unrollLoopIdx=-1):
       tc = tP["tensorChar"]
       self.vgprs.globalReadRegisters[tc] = []
       graIdx = 0
@@ -5886,6 +5940,8 @@ class KernelWriterAssembly(KernelWriter):
       bpe = tP["bpeGR"] if not tP["isM"] else tP["bpe"]
       bpl = bpe * tP["glvw"]  # bytes per load
 
+      g2lVgpr_prefix = "G2L%s%s" % ( tc, "" if kernel["PrefetchGlobalRead"] != 3 or unrollLoopIdx != 0 else "_1")
+      
       isGlc = True if tP["NonTemporal"]%2==1 else False
       isSlc = True if tP["NonTemporal"]//2==1 else False
       isLds = True if kernel["DirectToLds%s"%tc] else False
@@ -5974,7 +6030,7 @@ class KernelWriterAssembly(KernelWriter):
                   destVgpr=0
                   self.vgprs.globalReadRegisters[tc].append(0)
                 else:
-                  destVgpr="G2L%s+%u"%(tc, (g2lIdx+eccOffset+tP["shiftGR"]) if not tP["isM"] else graIdx)
+                  destVgpr="%s+%u"%(g2lVgpr_prefix, (g2lIdx+eccOffset+tP["shiftGR"]) if not tP["isM"] else graIdx)
                   self.vgprs.globalReadRegisters[tc].append(g2lIdx+eccOffset+tP["shiftGR"] if not tP["isM"] else graIdx)
                   if tP["isM"]:
                     assert(graIdx <= self.states.m.numVgprG2LAllocated)
@@ -5999,7 +6055,7 @@ class KernelWriterAssembly(KernelWriter):
 
                 #print "IM=", type(imod.instList[-1]), imod.instList[-1],
               else: # not buffer load
-                destVgpr="G2L%s+%u"%(tc, g2lIdx + tP["shiftGR"])
+                destVgpr="%s+%u%s"%(g2lVgpr_prefix, g2lIdx + tP["shiftGR"])
                 loadModule.add( self.chooseGlobalRead(False, \
                           bpl, \
                           destVgpr=destVgpr, \
@@ -6033,7 +6089,7 @@ class KernelWriterAssembly(KernelWriter):
                         glc=isGlc, slc=isSlc, lds=isLds, \
                         hi16=0, \
                         comment="G -> Reg ValuMetadata"))
-    globalReadBody(tP)
+    globalReadBody(tP, unrollLoopIdx)
 
     if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"] and tP["is_sparse"]:
         globalReadBody(tP["tpsMetadata"])
@@ -6375,8 +6431,9 @@ class KernelWriterAssembly(KernelWriter):
     imod = Module()
 
     LWDoMod = imod.add(Module())
-    LWDoA = self.localWriteDo(kernel, tPA) if self.do["LocalWrite%s"%tPA["tensorChar"]] else Module()
-    LWDoB = self.localWriteDo(kernel, tPB) if self.do["LocalWrite%s"%tPB["tensorChar"]] else Module()
+    ulIdx = -1 if kernel["PrefetchGlobalRead"] == 3 else 1 #loop 1: write first vgpr pool into lds
+    LWDoA = self.localWriteDo(kernel, tPA, ulIdx) if self.do["LocalWrite%s"%tPA["tensorChar"]] else Module()
+    LWDoB = self.localWriteDo(kernel, tPB, ulIdx) if self.do["LocalWrite%s"%tPB["tensorChar"]] else Module()
     LWDoMod.addComment1("local write a")
     LWDoMod.add(LWDoA)
     LWDoMod.addComment1("local write b")
@@ -6386,13 +6443,12 @@ class KernelWriterAssembly(KernelWriter):
   ##############################################################################
   # Local Write: Do It A/B
   ##############################################################################
-  def localWriteDo(self, kernel, tP):
+  def localWriteDo(self, kernel, tP, unrollLoopIdx=-1):
 
     tc = tP["tensorChar"]
     imod = Module()
     isBpeInputLarger = True if tP["bpeGR"] > tP["bpe"] else False
-
-    def localWriteBody(tP):
+    def localWriteBody(tP, unrollLoopIdx=-1):
       tc = tP["tensorChar"]
 
       instruction = tP["localWriteInstruction"]
@@ -6401,6 +6457,7 @@ class KernelWriterAssembly(KernelWriter):
       blockWidth = instruction.blockWidth
       #offsetMultiplier = instruction.offsetMultiplier
       g2lIdx = 0
+      g2lVgpr_prefix = "G2L%s%s" % ( tc, "" if kernel["PrefetchGlobalRead"] != 3 or unrollLoopIdx != 0 else "_1")
       #module.add(dump(vgpr("LocalWriteAddr%s"%tP["tensorChar"])))
       if 0:
         print("\nLocalWrite", tP["tensorChar"])
@@ -6489,15 +6546,15 @@ class KernelWriterAssembly(KernelWriter):
 
             # TODO- INT8: check uDu
             if (blockWidth == 0.25) and ((s % 4) == 0) and (not tP["isM"] or needToSplitMetadata):
-                src = "G2L%s+%u" % (tc, g2lIdx + eccOffset)
-                dst = "G2L%s+%u+%u" % (tc, tmpVgprOffset, g2lIdx)
+                src = "%s+%u" % (g2lVgpr_prefix, g2lIdx + eccOffset)
+                dst = "%s+%u+%u" % (g2lVgpr_prefix, tmpVgprOffset, g2lIdx)
                 if tP["bpe"] != tP["bpeGR"]:
                   if kernel["ProblemType"]["DataType%s"%tc].isHalf():
                     if tP["glvw"] > 1:
-                      dst = "G2L%s+%u+%u" % (tc, tmpVgprOffset, g2lIdx // 2)
-                      localWriteCVTCode.add(VPackF16toB32(dst=vgpr(dst), src0=vgpr(src), src1=vgpr("G2L%s+%u" % (tc, g2lIdx+1)), \
+                      dst = "%s+%u+%u" % (g2lVgpr_prefix, tmpVgprOffset, g2lIdx // 2)
+                      localWriteCVTCode.add(VPackF16toB32(dst=vgpr(dst), src0=vgpr(src), src1=vgpr("%s+%u" % (g2lVgpr_prefix, g2lIdx+1)), \
                                         vop3=VOP3PModifiers(op_sel=[1,1,0]), comment="Pack with neighbor"))
-                      localWriteCVTCode.add(VPackF16toB32(dst=vgpr(src), src0=vgpr(src), src1=vgpr("G2L%s+%u" % (tc, g2lIdx+1)), \
+                      localWriteCVTCode.add(VPackF16toB32(dst=vgpr(src), src0=vgpr(src), src1=vgpr("%s+%u" % (g2lVgpr_prefix, g2lIdx+1)), \
                                         vop3=VOP3PModifiers(op_sel=[0,0,0]), comment="Pack with neighbor"))
                   else:
                     printExit("Unsupported combination DataType%s (%s) -> DataType (%s)"%(tc, kernel["ProblemType"]["DataType%s"%tc].toChar(), kernel["ProblemType"]["DataType"].toChar()))
@@ -6511,21 +6568,21 @@ class KernelWriterAssembly(KernelWriter):
             for _ in range(0, numBlocks):
               # FIXME: In the future all registers should pass from global read instead of recalculate them
               if globalBlockWidth == blockWidth and tP["glvw"] == 1:
-                paramList.append(vgpr("G2L%s+%u"%(tc, self.vgprs.globalReadRegisters[tc][i]), blockWidth))
+                paramList.append(vgpr("%s+%u"%(g2lVgpr_prefix, self.vgprs.globalReadRegisters[tc][i]), blockWidth))
               elif blockWidth == 1:
-                paramList.append(vgpr("G2L%s+%u"%(tc, g2lIdx)))
+                paramList.append(vgpr("%s+%u"%(g2lVgpr_prefix, g2lIdx)))
                 numsOfRegister.append(1)
               elif blockWidth == 0.25 and ((s % 2) == 1): # Int8, s = 1 or 3 (high8Bits)
                 if tP["bpe"] != tP["bpeGR"] and tmpVgprOffset != 0:
-                  paramList.append(vgpr("G2L%s+%u+%u"%(tc, tmpVgprOffset, g2lIdx // 2)))
+                  paramList.append(vgpr("%s+%u+%u"%(g2lVgpr_prefix, tmpVgprOffset, g2lIdx // 2)))
                 else:
-                  paramList.append(vgpr("G2L%s+%u+%u"%(tc, tmpVgprOffset, g2lIdx)))
+                  paramList.append(vgpr("%s+%u+%u"%(g2lVgpr_prefix, tmpVgprOffset, g2lIdx)))
                 numsOfRegister.append(1)
               else:
-                paramList.append(vgpr("G2L%s+%u"%(tc, g2lIdx + eccOffset), blockWidth))
+                paramList.append(vgpr("%s+%u"%(g2lVgpr_prefix, g2lIdx + eccOffset), blockWidth))
                 numsOfRegister.append(blockWidth)
               if self.db["ForceInputValue%s"%tc]:
-                localWriteCVTCode.add(VMovB32(dst=vgpr("G2L%s+%u"%(tc, g2lIdx)), src=self.db["ForceValue%s"], comment="ForceInputValue"))
+                localWriteCVTCode.add(VMovB32(dst=vgpr("%s+%u"%(g2lVgpr_prefix, g2lIdx)), src=self.db["ForceValue%s"], comment="ForceInputValue"))
               if kernel["ProblemType"]["Fp16AltImpl"] and not tP["isM"]:
                 numIters = 1 if blockWidth <= 1 else blockWidth
                 vgprTmp = self.vgprPool.checkOut(2)
@@ -6536,9 +6593,9 @@ class KernelWriterAssembly(KernelWriter):
                     continue
                   fp16AltMap[f16Tobf16Idx] = 1
                   sdwa = SDWAModifiers(src0_sel=SelectBit.WORD_1)
-                  localWriteCVTCode.add(VCvtF16toF32(dst=vgpr(vgprTmp), src=vgpr("G2L%s+%u"%(tc, f16Tobf16Idx))))
-                  localWriteCVTCode.add(VCvtF16toF32(dst=vgpr(vgprTmp+1), src=vgpr("G2L%s+%u"%(tc, f16Tobf16Idx)),sdwa=sdwa))
-                  localWriteCVTCode.add(VPackF16toB32(dst=vgpr("G2L%s+%u"%(tc, f16Tobf16Idx)), src0=vgpr(vgprTmp), src1=vgpr(vgprTmp+1),
+                  localWriteCVTCode.add(VCvtF16toF32(dst=vgpr(vgprTmp), src=vgpr("%s+%u"%(g2lVgpr_prefix, f16Tobf16Idx))))
+                  localWriteCVTCode.add(VCvtF16toF32(dst=vgpr(vgprTmp+1), src=vgpr("%s+%u"%(g2lVgpr_prefix, f16Tobf16Idx)),sdwa=sdwa))
+                  localWriteCVTCode.add(VPackF16toB32(dst=vgpr("%s+%u"%(g2lVgpr_prefix, f16Tobf16Idx)), src0=vgpr(vgprTmp), src1=vgpr(vgprTmp+1),
                                     vop3=VOP3PModifiers(op_sel=[1,1,0])))
                 self.vgprPool.checkIn(vgprTmp)
 
@@ -6585,7 +6642,7 @@ class KernelWriterAssembly(KernelWriter):
                 else:
                   for vi in range(0, int(newBlockWidth)):
                     dst_sel = SelectBit.WORD_1 if vi%2==1 else SelectBit.WORD_0
-                    localWriteCVTCode.add(VCvtF32toF16(dst=vgpr("G2L%s+%u+%u"%(tP["tensorChar"], g2lIdx, vi//2)), src=vgpr("G2L%s+%u+%u"%(tP["tensorChar"], g2lIdx, vi)), sdwa=SDWAModifiers(dst_sel=dst_sel), comment="convert C to fp16"))
+                    localWriteCVTCode.add(VCvtF32toF16(dst=vgpr("%s+%u+%u"%(g2lVgpr_prefix, g2lIdx, vi//2)), src=vgpr("%s+%u+%u"%(g2lVgpr_prefix, g2lIdx, vi)), sdwa=SDWAModifiers(dst_sel=dst_sel), comment="convert C to fp16"))
               elif (kernel["ProblemType"]["DataType%s"%tc].isHalf() and kernel["ProblemType"]["DataType"].isFloat8()):
                 newBlockWidth = (tP["bpeGR"] / tP["bpe"]) * blockWidth
                 if newBlockWidth == 0.5:
@@ -6603,12 +6660,12 @@ class KernelWriterAssembly(KernelWriter):
                   vgprTmp2 = vgprTmp + 1
                   for vi in range(0, int(newBlockWidth)):
                     sel = 1 if vi %2 == 1 else 0
-                    localWriteCVTCode.add(VCvtF16toF32(dst=vgpr(vgprTmp), src=vgpr("G2L%s+%u+%u"%(tP["tensorChar"], g2lIdx, vi)), sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_0), comment="convert to F32"))
-                    localWriteCVTCode.add(VCvtF16toF32(dst=vgpr(vgprTmp2), src=vgpr("G2L%s+%u+%u"%(tP["tensorChar"], g2lIdx, vi)), sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_1), comment="convert to F32"))
+                    localWriteCVTCode.add(VCvtF16toF32(dst=vgpr(vgprTmp), src=vgpr("%s+%u+%u"%(g2lVgpr_prefix, g2lIdx, vi)), sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_0), comment="convert to F32"))
+                    localWriteCVTCode.add(VCvtF16toF32(dst=vgpr(vgprTmp2), src=vgpr("%s+%u+%u"%(g2lVgpr_prefix, g2lIdx, vi)), sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_1), comment="convert to F32"))
                     # ScaleA/B, sgpr upper is dummy.
                     if kernel["ProblemType"]["UseScaleAB"] and kernel["ProblemType"]["DataType%s"%tc].numRegisters() > kernel["ProblemType"]["DataType"].numRegisters():
                       localWriteCVTCode.add(VMulPKF32(dst=vgpr(vgprTmp, 2), src0=vgpr(vgprTmp, 2), src1=sgpr("Scale%s"%tc, 2), vop3=VOP3PModifiers(op_sel_hi=[1,0,1]), comment="Input *= scale %s"%tc))
-                    localWriteCVTCode.add(VCvtPkF32toFP8(dst=vgpr("G2L%s+%u+%u"%(tP["tensorChar"], g2lIdx, vi//2)), src0=vgpr(vgprTmp), src1=vgpr(vgprTmp2), vop3=VOP3PModifiers(op_sel=[0,0,sel]), comment="Convert to FP8"))
+                    localWriteCVTCode.add(VCvtPkF32toFP8(dst=vgpr("%s+%u+%u"%(g2lVgpr_prefix, g2lIdx, vi//2)), src0=vgpr(vgprTmp), src1=vgpr(vgprTmp2), vop3=VOP3PModifiers(op_sel=[0,0,sel]), comment="Convert to FP8"))
                   self.vgprPool.checkIn(vgprTmp)
               elif (kernel["ProblemType"]["DataType%s"%tc].isFloat8() and kernel["ProblemType"]["DataType"].isHalf()):
                 newBlockWidth = tP["globalReadInstruction"].blockWidth
@@ -6653,24 +6710,24 @@ class KernelWriterAssembly(KernelWriter):
                   src_sel = SelectBit.WORD_1 if isCvtHighBits else SelectBit.WORD_0
                   modNum = max(1, int(newBlockWidth / blockWidth))
                   if (not isHigh16Bits) and (g2lIdx % modNum == 0):
-                    localWriteCVTCode.add(VCvtPkFP8toF32(dst=vgpr(vgprTmp, 2), src=vgpr("G2L%s+%u"%(tP["tensorChar"], g2lIdx)), sdwa=SDWAModifiers(src0_sel=src_sel), comment="convert to F32"))
-                    localWriteCVTCode.add(VCvtF32toF16(dst=vgpr("G2L%s+%u"%(tP["tensorChar"], g2lIdx)), src=vgpr(vgprTmp), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
+                    localWriteCVTCode.add(VCvtPkFP8toF32(dst=vgpr(vgprTmp, 2), src=vgpr("%s+%u"%(g2lVgpr_prefix, g2lIdx)), sdwa=SDWAModifiers(src0_sel=src_sel), comment="convert to F32"))
+                    localWriteCVTCode.add(VCvtF32toF16(dst=vgpr("%s+%u"%(g2lVgpr_prefix, g2lIdx)), src=vgpr(vgprTmp), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
                     if (newBlockWidth <= blockWidth):
-                      localWriteCVTCode.add(VCvtF32toF16(dst=vgpr("G2L%s+%u"%(tP["tensorChar"], g2lIdx)), src=vgpr(vgprTmp+1), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
+                      localWriteCVTCode.add(VCvtF32toF16(dst=vgpr("%s+%u"%(g2lVgpr_prefix, g2lIdx)), src=vgpr(vgprTmp+1), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
                   elif (newBlockWidth > blockWidth):
-                    localWriteCVTCode.add(VCvtF32toF16(dst=vgpr("G2L%s+%u"%(tP["tensorChar"], g2lIdx)), src=vgpr(vgprTmp+1), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
+                    localWriteCVTCode.add(VCvtF32toF16(dst=vgpr("%s+%u"%(g2lVgpr_prefix, g2lIdx)), src=vgpr(vgprTmp+1), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
                   self.vgprPool.checkIn(vgprTmp)
                 else:
                   modNum = max(1, int(newBlockWidth / blockWidth))
                   vgprTmp = self.vgprPool.checkOutAligned(2, 2)
                   if (not isHigh16Bits) and (newBlockWidth <= blockWidth):
                     for vi in range(0, int(newBlockWidth)):
-                      localWriteCVTCode.add(VCvtPkFP8toF32(dst=vgpr(vgprTmp, 2), src=vgpr("G2L%s+%u+%u"%(tP["tensorChar"], g2lIdx+tP["shiftGR"], vi)), sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_0), comment="convert to F32"))
-                      localWriteCVTCode.add(VCvtF32toF16(dst=vgpr("G2L%s+%u+%u"%(tP["tensorChar"], g2lIdx, vi * 2)), src=vgpr(vgprTmp), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
-                      localWriteCVTCode.add(VCvtF32toF16(dst=vgpr("G2L%s+%u+%u"%(tP["tensorChar"], g2lIdx, vi * 2)), src=vgpr(vgprTmp+1), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
-                      localWriteCVTCode.add(VCvtPkFP8toF32(dst=vgpr(vgprTmp, 2), src=vgpr("G2L%s+%u+%u"%(tP["tensorChar"], g2lIdx+tP["shiftGR"], vi)), sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_1), comment="convert to F32"))
-                      localWriteCVTCode.add(VCvtF32toF16(dst=vgpr("G2L%s+%u+%u"%(tP["tensorChar"], g2lIdx, vi * 2 + 1)), src=vgpr(vgprTmp), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
-                      localWriteCVTCode.add(VCvtF32toF16(dst=vgpr("G2L%s+%u+%u"%(tP["tensorChar"], g2lIdx, vi * 2 + 1)), src=vgpr(vgprTmp+1), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
+                      localWriteCVTCode.add(VCvtPkFP8toF32(dst=vgpr(vgprTmp, 2), src=vgpr("%s+%u+%u"%(g2lVgpr_prefix, g2lIdx+tP["shiftGR"], vi)), sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_0), comment="convert to F32"))
+                      localWriteCVTCode.add(VCvtF32toF16(dst=vgpr("%s+%u+%u"%(g2lVgpr_prefix, g2lIdx, vi * 2)), src=vgpr(vgprTmp), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
+                      localWriteCVTCode.add(VCvtF32toF16(dst=vgpr("%s+%u+%u"%(g2lVgpr_prefix, g2lIdx, vi * 2)), src=vgpr(vgprTmp+1), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
+                      localWriteCVTCode.add(VCvtPkFP8toF32(dst=vgpr(vgprTmp, 2), src=vgpr("%s+%u+%u"%(g2lVgpr_prefix, g2lIdx+tP["shiftGR"], vi)), sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_1), comment="convert to F32"))
+                      localWriteCVTCode.add(VCvtF32toF16(dst=vgpr("%s+%u+%u"%(g2lVgpr_prefix, g2lIdx, vi * 2 + 1)), src=vgpr(vgprTmp), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
+                      localWriteCVTCode.add(VCvtF32toF16(dst=vgpr("%s+%u+%u"%(g2lVgpr_prefix, g2lIdx, vi * 2 + 1)), src=vgpr(vgprTmp+1), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
                   else:
                     if (not isHigh16Bits):
                       idxMod = g2lIdx % modNum
@@ -6678,12 +6735,12 @@ class KernelWriterAssembly(KernelWriter):
                       vi = idxMod // 2
                       selectBit = SelectBit.WORD_0 if idxMod % 2 == 0 else SelectBit.WORD_1
                       interOffset = 0 if idxMod % 2 == 0 else 1
-                      localWriteCVTCode.add(VCvtPkFP8toF32(dst=vgpr(vgprTmp, 2), src=vgpr("G2L%s+%u+%u"%(tP["tensorChar"], g2lIdxTmp+tP["shiftGR"], vi)), sdwa=SDWAModifiers(src0_sel=selectBit), comment="convert to F32"))
-                      localWriteCVTCode.add(VCvtF32toF16(dst=vgpr("G2L%s+%u+%u"%(tP["tensorChar"], g2lIdxTmp, vi * 2 + interOffset)), src=vgpr(vgprTmp), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
+                      localWriteCVTCode.add(VCvtPkFP8toF32(dst=vgpr(vgprTmp, 2), src=vgpr("%s+%u+%u"%(g2lVgpr_prefix, g2lIdxTmp+tP["shiftGR"], vi)), sdwa=SDWAModifiers(src0_sel=selectBit), comment="convert to F32"))
+                      localWriteCVTCode.add(VCvtF32toF16(dst=vgpr("%s+%u+%u"%(g2lVgpr_prefix, g2lIdxTmp, vi * 2 + interOffset)), src=vgpr(vgprTmp), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
                       if blockWidth != 0.5:
-                        localWriteCVTCode.add(VCvtF32toF16(dst=vgpr("G2L%s+%u+%u"%(tP["tensorChar"], g2lIdxTmp, vi * 2 + interOffset)), src=vgpr(vgprTmp+1), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
+                        localWriteCVTCode.add(VCvtF32toF16(dst=vgpr("%s+%u+%u"%(g2lVgpr_prefix, g2lIdxTmp, vi * 2 + interOffset)), src=vgpr(vgprTmp+1), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
                     elif blockWidth == 0.5:
-                      localWriteCVTCode.add(VCvtF32toF16(dst=vgpr("G2L%s+%u+%u"%(tP["tensorChar"], g2lIdxTmp, vi * 2 + interOffset)), src=vgpr(vgprTmp+1), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
+                      localWriteCVTCode.add(VCvtF32toF16(dst=vgpr("%s+%u+%u"%(g2lVgpr_prefix, g2lIdxTmp, vi * 2 + interOffset)), src=vgpr(vgprTmp+1), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
                   self.vgprPool.checkIn(vgprTmp)
               else:
                 printExit("Unsupported combination DataType%s (%s) -> DataType (%s)"%(tc, kernel["ProblemType"]["DataType%s"%tc].toChar(), kernel["ProblemType"]["DataType"].toChar()))
@@ -6729,7 +6786,7 @@ class KernelWriterAssembly(KernelWriter):
         #localWriteCode.add(self.getBomb())
 
     if (not kernel["DirectToLds%s"%tc]):
-      localWriteBody(tP)
+      localWriteBody(tP, unrollLoopIdx)
       if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
         if tP["is_sparse"]:
           localWriteBody(tP["tpsMetadata"])
@@ -9253,18 +9310,18 @@ class KernelWriterAssembly(KernelWriter):
         batchElementSgprs, tmpSgpr, codeAccVgprRead, codeMulAlpha, packdata, self)
 
   ##############################################################################
-  def openPrefetchGlobalRead2(self, kernel):
+  def openPrefetchGlobalReadMultiple(self, kernel):
     imod = Module()
     loopCounter = self.loopCounter(kernel, self.states.unrollIdx)
-    imod.add(SCmpEQU32(src0=loopCounter, src1=hex(1), comment="PGR=2 but only 1 loop"))
-    skipPGR2 = Label(self.labels.getName("skipPGR2"), "")
-    imod.add(SCBranchSCC1(labelName=skipPGR2.getLabelName(), comment="PGR=2 but only 1 loop"))
+    imod.add(SCmpEQU32(src0=loopCounter, src1=hex(1), comment="PGR=%u but only 1 loop"%kernel["PrefetchGlobalRead"]))
+    skipPGR = Label(self.labels.getName("skipPGR%u"%kernel["PrefetchGlobalRead"]), "")
+    imod.add(SCBranchSCC1(labelName=skipPGR.getLabelName(), comment="PGR=%u but only 1 loop"%kernel["PrefetchGlobalRead"]))
     return imod
 
-  def closePrefetchGlobalRead2(self):
+  def closePrefetchGlobalReadMultiple(self, kernel):
     imod = Module()
-    skipPGR2 = Label(self.labels.getName("skipPGR2"), "")
-    imod.add(skipPGR2)
+    skipPGR = Label(self.labels.getName("skipPGR%u"%kernel["PrefetchGlobalRead"]), "")
+    imod.add(skipPGR)
     return imod
 
   ########################################

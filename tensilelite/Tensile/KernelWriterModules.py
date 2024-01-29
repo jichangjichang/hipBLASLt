@@ -119,7 +119,7 @@ def syncThreads(kernel, archCaps, comment=""):
         if archCaps["SeparateVscnt"]:
             imod.add(SWaitCnt(lgkmcnt="null", comment="extra navi wait"))
         elif kernel["ScheduleIterAlg"] == 2 \
-          or kernel["PrefetchGlobalRead"] == 2:
+          or kernel["PrefetchGlobalRead"] >= 2:
             imod.addComment("Skip force waitcnt0")
         elif archCaps["Waitcnt0Disabled"]:
             # FIXME: should we add s_waitcnt_vscnt?

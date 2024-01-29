@@ -2132,7 +2132,8 @@ class Solution(collections.abc.Mapping):
       if not (bufferLoad and ( state["PrefetchGlobalRead"] == 1 \
               or (state["PrefetchGlobalRead"] > 1 and \
                   (state["ProblemType"]["DataType"].isDouble() or state["ProblemType"]["DataType"].isDoubleComplex()))
-              or (state["ProblemType"]["Sparse"] and state["PrefetchGlobalRead"] > 0))):
+              or (state["ProblemType"]["Sparse"] and state["PrefetchGlobalRead"] > 0))
+              or state["PrefetchGlobalRead"] == 3):
         state["ExpandPointerSwap"] = 0
 
     #print("PackedC0IdxChars", state["PackedC0IdxChars"])
@@ -2987,6 +2988,10 @@ class Solution(collections.abc.Mapping):
       if state["VectorWidthA"] > 1 or state["VectorWidthB"] > 1:
         reject(state, "VW>1 not compatible with StoreRemap")
         return
+
+    if state["PrefetchGlobalRead"] == 3 and not state["ExpandPointerSwap"]:
+      reject(state, "Only support PGR3 with EPS=1.")
+      return
 
     # Sparse problem
     if state["ProblemType"]["Sparse"]:

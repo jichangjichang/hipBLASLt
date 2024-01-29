@@ -469,7 +469,13 @@ validParameters = {
     # Do another prefetch while writing data from vgpr to lds.
     #   prefetch / double-buffer reads from global memory -> vgprs --> lds.
     #                                                              |-> prefetch reads
-    "PrefetchGlobalRead":         [ 0, 1, 2 ],
+    # PrefetchGlobalRead = 3:
+    # Do another prefetch while writing data from vgpr to lds.
+    #   prefetch / triple-buffer reads from global memory
+    #        two buffers are in vgpr pool and one buffer is in LDS
+    #
+    # FIX ME:  Result is incorrect if sizeK < 3*DU
+    "PrefetchGlobalRead":         [ 0, 1, 2, 3],
 
     # number of iteration prefetch local reads from lds to VGPRs buffer = PLR
     "PrefetchLocalRead":          list(range(128+1)),

@@ -79,6 +79,7 @@ class ABMatrixInfo(MatrixInfo):
   numVgprG2L: int                = -1
   numVgprG2LAllocated: int       = -1
   startVgprG2L: Optional[int]    = None
+  startVgprG2L_1: Optional[int]  = None
   numVgprLocalReadAddr:int       = -1
   startVgprLocalReadAddr: int    = -1
   numVgprLocalWriteAddr: int     = -1
@@ -492,7 +493,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
   # that all necessary dependency are met.  The driver code in kernelBody
   # blindly follows the plan set in unrollLoopHeaderCode and perIterCode
   ##############################################################################
-  def makeSchedule(self, kernel, tensorParametersA, tensorParametersB, localWriteEndIter, skipGlobalReadInc=False, firstIter=False, lastLoop=False, lastLc=False):
+  def makeSchedule(self, kernel, tensorParametersA, tensorParametersB, localWriteEndIter, skipGlobalReadInc=False, firstIter=False, lastLoop=False, lastLc=False, lastNGLL=False):
 
     maxVmcnt = self.states.asmCaps["MaxVmcnt"]
 
@@ -514,7 +515,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     siaComponent = Component.SIA.find(self)
     siaComponent.schedIntoIteration(self, kernel, tensorParametersA, tensorParametersB, \
-      localWriteEndIter, firstIter, lastLoop, lastLc, maxVmcnt, globalReadIncACode, \
+      localWriteEndIter, firstIter, lastLoop, lastLc, lastNGLL, maxVmcnt, globalReadIncACode, \
       globalReadIncBCode)
 
   ##############################################################################
@@ -1486,15 +1487,19 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # prefetch: unrolled loop prefix
     ####################################
     if kernel["PrefetchGlobalRead"]:
-      pfi = 1
       module.addComment1("prefetch: global -> local")
+      pfi = 1
+      ulIdx = -1
+      if kernel["PrefetchGlobalRead"] == 3:
+        pfi = 2
+        ulIdx = 1 #loop 1: prefetch buffer into first vgpr pool
       module.add(self.openSumAtLeastUnroll(kernel, prefetch=True, isOptNLL=isOptNLL))
       moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParametersA, usePlaceHolder=False)
       module.add(replaceHolder(moduleTmp, 0))
-      module.add(self.globalReadDo(kernel, 0, tensorParametersA))
+      module.add(self.globalReadDo(kernel, 0, tensorParametersA, ulIdx))
       moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParametersB, usePlaceHolder=False)
       module.add(replaceHolder(moduleTmp, 0))
-      module.add(self.globalReadDo(kernel, 0, tensorParametersB))
+      module.add(self.globalReadDo(kernel, 0, tensorParametersB, ulIdx))
       module.add(self.globalReadIncrementAB(kernel, tensorParametersA, tensorParametersB, self.states.unrollIdx, pfi))
 
     module.addComment2("End setupNewTile")
@@ -1504,7 +1509,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
   ##############################################################################
   # No Load Loop Body
   ##############################################################################
-  def noLoadLoopBody( self, kernel, tensorParametersA, tensorParametersB, pack, isOptNLL, isNGLL, NLLfirst, NLLlast):
+  def noLoadLoopBody( self, kernel, tensorParametersA, tensorParametersB, pack, isOptNLL, isNGLL, NLLfirst, NLLlast, loopIndex=0, loopCopies=0):
     module = Module("noLoadLoopBody")
     expand = kernel["ExpandPointerSwap"]
     lastuIdx = False
@@ -1516,18 +1521,20 @@ class KernelWriter(metaclass=abc.ABCMeta):
     for uIdx in range(0, kernel["LoopIters"]):
       u = uIdx % kernel["LoopIters"]    #   u: index in compute loop (in contrast to the notion of global read loop)
       isLastLoop = not isNGLL
+      lastLc = (loopIndex+1 == loopCopies)
       if u == 0:
         if not isLastLoop:
-          self.codes.localWriteA = self.localWriteDo(kernel, tensorParametersA)  # local write in loopcnt N targets data for loopcnt N+1
-          self.codes.localWriteB = self.localWriteDo(kernel, tensorParametersB)
+          self.codes.localWriteA = self.localWriteDo(kernel, tensorParametersA, loopIndex)  # local write in loopcnt N targets data for loopcnt N+1
+          self.codes.localWriteB = self.localWriteDo(kernel, tensorParametersB, loopIndex)
         else:
           self.codes.localWriteA = Module()
           self.codes.localWriteB = Module()
 
         if not isNGLL or (isNGLL and kernel["ExpandPointerSwap"]):
+          lastNGLL = isNGLL and (loopIndex+1 == loopCopies)
           # PAP would have GlobalRead and GlobalInc, but no localWrite
           # Get the perIterGlobalReadCode code for PAP (if PAP=On), else would be empty
-          self.makeSchedule(kernel, tensorParametersA, tensorParametersB, localWriteEndIter, skipGlobalReadInc=False, lastLoop=NLLlast)
+          self.makeSchedule(kernel, tensorParametersA, tensorParametersB, localWriteEndIter, skipGlobalReadInc=False, lastLoop=NLLlast, lastLc=lastLc, lastNGLL=lastNGLL)
           module.add(self.codes.unrollLoopHeader)
 
       # which loop iteration to reset the LRO,
@@ -1619,7 +1626,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           if isSwapLroIter: # ResetLroIter
             # Swap, reset, or increment the LRO:
             # force internalPointerSwap = False in NGLL case
-            internalPointerSwap = expand and not isNGLL
+            internalPointerSwap = expand and (not isNGLL or kernel["PrefetchGlobalRead"] == 3)
             pointerLRCode.addComment1("local read swap offsets a")
             pointerLRCode.add(self.localReadSwapOffsets(kernel, internalPointerSwap, tensorParametersA))
             pointerLRCode.addComment1("local read swap offsets b")
@@ -1655,6 +1662,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
                       u, pointerLWCode, pointerLRCode, waitCode, macIterCode, waitLWCode, syncCode, pack[luIdx], NLLlast)
       module.add(subIterCode)
       pack[luIdx] = Module()
+
+    if kernel["PrefetchGlobalRead"] == 3 and isNGLL:
+      module.addComment2("No Global Load Loop - End %u/%u"%(loopIndex+1, loopCopies))
+
     return module
 
   ##############################################################################
@@ -1671,7 +1682,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     module.addComment2(startComment)
     NLLfirst = True
     NLLlast = True
-    if kernel["PrefetchGlobalRead"] == 2:
+    if kernel["PrefetchGlobalRead"] >= 2:
       # PGR=2 case NoLoadLoop(NLL) is generated twice
       # we need to distinguish them to generate proper code at each NLL
       if isNGLL:
@@ -1708,20 +1719,38 @@ class KernelWriter(metaclass=abc.ABCMeta):
       module.add(self._wait(kernel, tensorParametersA, tensorParametersB, -1, 0, -1, "4wait for local write"))
       module.add(self._syncThreads(kernel))
 
-    # generate no Load Loop Body code
-    module.add(self.noLoadLoopBody(kernel, tensorParametersA, tensorParametersB, pack, isOptNLL, isNGLL, NLLfirst, NLLlast))
+    if kernel["PrefetchGlobalRead"] == 3 and isNGLL:
+      toPGR2 = Label(self.labels.getName("toPGR2"), "")
+      toPGR2_1 = Label(self.labels.getName("toPGR2_1"), "")
+    # generate 2 no Global Load Loop Body code
+    # Local write code sections are different for odd/even loop
+      loopCopies = 2
+      for loopIndex in range(0, loopCopies):
+        startComment = "%s. %s %u/%u - Begin " % (isOptNLLComment, LoopNameComment, loopIndex+1, loopCopies)
+        if loopIndex == 0:
+          module.add(toPGR2)
+        else:
+          module.add(toPGR2_1)
+        module.addComment2(startComment)
+        module.add(self.noLoadLoopBody(kernel, tensorParametersA, tensorParametersB, pack, isOptNLL, isNGLL, NLLfirst, NLLlast, loopIndex, loopCopies))
+        module.add(self.closeSumAtLeastUnroll(kernel, tensorParametersA, tensorParametersB, prefetch=False, isOptNLL=isOptNLL, isNGLL=isNGLL, loopIndex=loopIndex))
+    else:
+      module.add(self.noLoadLoopBody(kernel, tensorParametersA, tensorParametersB, pack, isOptNLL, isNGLL, NLLfirst, NLLlast))
 
     if self.do["executeToLoopEnd"] and isOptNLL:
       module.add(self.functionEnd(False))
 
-    # Close code is necessary for both first and last (NGLL case(=NLLfirst) needs label)
-    module.add(self.closeSumAtLeastUnroll(kernel, tensorParametersA, tensorParametersB, prefetch=False, isOptNLL=isOptNLL, isNGLL=isNGLL))
+    # PGR 3 already generated 2 Close code
+    if kernel["PrefetchGlobalRead"] != 3 or not isNGLL:
+      # Close code is necessary for both first and last (NGLL case(=NLLfirst) needs label)
+      module.add(self.closeSumAtLeastUnroll(kernel, tensorParametersA, tensorParametersB, prefetch=False, isOptNLL=isOptNLL, isNGLL=isNGLL))
 
     return module
 
   ##############################################################################
   # Loop Body
   ##############################################################################
+  #TODO: remove finalLoop and firstIter
   def loopBody( self, kernel, tensorParametersA, tensorParametersB, pack, lc, loopCopies, finalLoop, firstIter=False ):
     module = Module("loopBody")
     expand = kernel["ExpandPointerSwap"]
@@ -1748,8 +1777,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.codes.globalReadIncrements = self.globalReadIncrementAB(kernel, tensorParametersA, tensorParametersB, self.states.unrollIdx, 0)
 
     if not kernel["NoLdsWriteCode"]:
-      self.codes.localWriteA = self.localWriteDo(kernel, tensorParametersA)
-      self.codes.localWriteB = self.localWriteDo(kernel, tensorParametersB)
+      self.codes.localWriteA = self.localWriteDo(kernel, tensorParametersA, unrollLoopIdx=lc)
+      self.codes.localWriteB = self.localWriteDo(kernel, tensorParametersB, unrollLoopIdx=lc)
     else:
       self.codes.localWriteA = Module()
       self.codes.localWriteB = Module()
@@ -1835,8 +1864,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
       if u==0: # if at start of subloop...
         # ...update local write code
         if not kernel["NoLdsWriteCode"]:
-          self.codes.localWriteA = self.localWriteDo(kernel, tensorParametersA)  # local write in loopcnt N targets data for loopcnt N+1
-          self.codes.localWriteB = self.localWriteDo(kernel, tensorParametersB)
+          self.codes.localWriteA = self.localWriteDo(kernel, tensorParametersA, unrollLoopIdx=lc)  # local write in loopcnt N targets data for loopcnt N+1
+          self.codes.localWriteB = self.localWriteDo(kernel, tensorParametersB, unrollLoopIdx=lc)
         else:
           self.codes.localWriteA = Module()
           self.codes.localWriteB = Module()
@@ -2104,6 +2133,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     module = Module("body")
     module.add(self.defineAndResources(kernel, tensorParametersA, tensorParametersB, lralwaMod))
 
+    # first prefetch is here for PGR2
     module.add(self.setupNewTile(kernel, tensorParametersA, tensorParametersB, isOptNLL=False))
 
     if self.do["executeToPrefetchEnd"]:
@@ -2122,7 +2152,25 @@ class KernelWriter(metaclass=abc.ABCMeta):
             module.add(self.initSumUnroll(kernel))
         module.add(self.closeShadowInit(kernel))
 
-      module.add(self._wait(kernel, tensorParametersA, tensorParametersB, 0, -1, -1, "8wait for global read"))
+      ####################################
+      # prefetch: unrolled loop prefix
+      ####################################
+      if kernel["PrefetchGlobalRead"] == 3:
+        pfi = 1
+        ulIdx = 0 # Loop 0: prefetch second global buffer into secound vgpr pool
+        module.addComment1("PGR3 : second global -> local")
+        module.add(self.openSumAtLeastUnroll(kernel, prefetch=True, isOptNLL=False))
+        moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParametersA, usePlaceHolder=False)
+        module.add(replaceHolder(moduleTmp, 0))
+        module.add(self.globalReadDo(kernel, 0, tensorParametersA, ulIdx))
+        moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParametersB, usePlaceHolder=False)
+        module.add(replaceHolder(moduleTmp, 0))
+        module.add(self.globalReadDo(kernel, 0, tensorParametersB, ulIdx))
+        module.add(self.globalReadIncrementAB(kernel, tensorParametersA, tensorParametersB, self.states.unrollIdx, pfi))
+        module.add(self._wait(kernel, tensorParametersA, tensorParametersB, 1, -1, -1, "8wait for global read"))
+      else:
+        module.add(self._wait(kernel, tensorParametersA, tensorParametersB, 0, -1, -1, "8wait for global read"))
+
       # These cases loop back and run the prefetch loop again
       # we need an extra barrier to ensure that the ds_reads (either for SR or MFMA) from previous iteration
       # have finished before we generate the prefetch for the next summation index.
@@ -2138,12 +2186,15 @@ class KernelWriter(metaclass=abc.ABCMeta):
       module.addComment1("local write swap b")
       module.add(self.localWriteSwapOffsets(kernel, expand, tensorParametersB))
 
-      if kernel["PrefetchGlobalRead"] == 2:
-        module.add(self.openPrefetchGlobalRead2(kernel))
+      if kernel["PrefetchGlobalRead"] >= 2:
+        ulIdx = -1
+        if kernel["PrefetchGlobalRead"] == 3:
+          ulIdx = 1 #loop 1: prefetch buffer into first vgpr pool
+        module.add(self.openPrefetchGlobalReadMultiple(kernel))
         module.add(self.directToLdsM0Update(kernel, 1, tensorParametersA))
-        module.add(self.globalReadDo(kernel, 0, tensorParametersA))
+        module.add(self.globalReadDo(kernel, 0, tensorParametersA, ulIdx))
         module.add(self.directToLdsM0Update(kernel, 1, tensorParametersB))
-        module.add(self.globalReadDo(kernel, 0, tensorParametersB))
+        module.add(self.globalReadDo(kernel, 0, tensorParametersB, ulIdx))
 
         # swap local ptrs again if DirectToLds is enabled
         if kernel["DirectToLdsA"]:
@@ -2153,7 +2204,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           module.addComment1("local write swap b")
           module.add(self.localWriteSwapOffsets(kernel, expand, tensorParametersB))
 
-        module.add(self.closePrefetchGlobalRead2())
+        module.add(self.closePrefetchGlobalReadMultiple(kernel))
 
       # prefetch-local
       if self.states.numItersPLR:
@@ -2222,8 +2273,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
       if(kernel["DirectToLdsB"]):
         module.addComment1("local write swap offsets b")
         module.add(self.localWriteSwapOffsets(kernel, expand, tensorParametersB))
-
-    if kernel["PrefetchGlobalRead"] == 2:
+ 
+    # toPGR1 or toPGR2
+    if kernel["PrefetchGlobalRead"] >= 2:
       module.add(self.noLoadLoop(kernel, tensorParametersA, tensorParametersB, isOptNLL=False, isNGLL=True, pack=pack))
 
     # This "NoLoad" loop is a copy of the unroll loop but with global loads + LDS writes removed
@@ -3411,11 +3463,16 @@ class KernelWriter(metaclass=abc.ABCMeta):
       # TODO: alignment hack, figure out a better solution
       vgprIdx = ((vgprIdx+1)//2)*2
       self.states.a.startVgprG2L = vgprIdx; vgprIdx += self.states.a.numVgprG2LAllocated
+      if kernel["PrefetchGlobalRead"] == 3:
+        self.states.a.startVgprG2L_1 = vgprIdx; vgprIdx += self.states.a.numVgprG2LAllocated
 
     if self.states.b.startVgprG2L is None:
       # TODO: alignment hack, figure out a better solution
       vgprIdx = ((vgprIdx+1)//2)*2
       self.states.b.startVgprG2L = vgprIdx; vgprIdx += self.states.b.numVgprG2LAllocated
+      if kernel["PrefetchGlobalRead"] == 3:
+        self.states.b.startVgprG2L_1 = vgprIdx; vgprIdx += self.states.b.numVgprG2LAllocated
+
 
     if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
       if self.states.m.startVgprG2L is None:
@@ -4114,7 +4171,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     return ""
 
   @abc.abstractmethod
-  def closeSumAtLeastUnroll(self, kernel, tPA, tPB, prefetch, isOptNLL, isNGLL):
+  def closeSumAtLeastUnroll(self, kernel, tPA, tPB, prefetch, isOptNLL, isNGLL, loopIndex = 0):
     return ""
 
   ##############################################################################
@@ -4271,11 +4328,11 @@ class KernelWriter(metaclass=abc.ABCMeta):
   # PrefetchGlobalRead2
   ##############################################################################
   @abc.abstractmethod
-  def openPrefetchGlobalRead2(self, kernel):
+  def openPrefetchGlobalReadMultiple(self, kernel):
     return ""
 
   @abc.abstractmethod
-  def closePrefetchGlobalRead2(self):
+  def closePrefetchGlobalReadMultiple(self, kernel):
     return ""
 
   ##############################################################################
