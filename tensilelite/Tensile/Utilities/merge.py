@@ -312,12 +312,17 @@ def mergeLogic(origData, incData, forceMerge, trimSize=True, addSolutionTags=Fal
     incData, numIncRemoved = removeUnusedKernels(incData, "Inc logic file: ")
 
     solutionPool = deepcopy(origData[5])
-    solutionMap = deepcopy(origData[7])
+    solutionMap = deepcopy(origData[7][:4])
 
-    origDict = {tuple(origSize): [i, origEff] for i, [origSize, [origIndex, origEff]] in enumerate(origData[7])}
+    origDict = {tuple(origSize): [i, origEff] for i, [origSize, [origIndex, origEff]] in enumerate(origData[7][:4])}
     for incSize, [incIndex, incEff] in incData[7]:
+        #if incSize[0] != 1 and incSize[1] != 1 and incSize[3] != 1:
+        #    continue;
+        #print("incSize ", incSize)
         incSolution = findSolutionWithIndex(incData[5], incIndex)
-
+        if incSolution["GlobalReadVectorWidthA"] != 1 or incSolution["GlobalReadVectorWidthB"] != 1 or incSolution["GlobalSplitU"] != 1:
+            continue;
+   
         storeEff = incEff if noEff == False else 0.0
         try:
             j, origEff = origDict[tuple(incSize)]
@@ -337,8 +342,10 @@ def mergeLogic(origData, incData, forceMerge, trimSize=True, addSolutionTags=Fal
                 verbose("[X]", incSize, "has been rejected because a compatible solution already exists with higher performance")
             else:
                 verbose("[-]", incSize, "has been added to solution table, Efficiency: N/A ->", incEff)
+                print("incSize ", incSize)
                 solutionPool, index = addKernel(solutionPool, incSolution)
                 solutionMap.append([incSize,[index, storeEff]])
+                break;
 
     verbose(numOrigRemoved, "unused kernels removed from base logic file")
     verbose(numIncRemoved, "unused kernels removed from incremental logic file")
@@ -346,6 +353,7 @@ def mergeLogic(origData, incData, forceMerge, trimSize=True, addSolutionTags=Fal
     # Remove SolutionTag for yaml output
     if addSolutionTags:
         solutionMap = removeSolutionTagFromKeys(solutionMap)
+
 
     mergedData = deepcopy(origData)
     mergedData[5] = solutionPool
