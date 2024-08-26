@@ -180,7 +180,7 @@ class ProblemType:
 
         rv.groupedGemm = False
         if 'GroupedGemm' in d:
-          rv.groupedGemm = d['GroupedGemm']
+          rv.groupedGemm = int(d['GroupedGemm'])
 
         rv.setConstStrideA = []
         if 'SetConstStrideA' in d:
@@ -366,7 +366,7 @@ class ProblemType:
             predicates.append(ProblemPredicate("UseBias", value=self.useBias))
             predicates.append(ProblemPredicate("UseE", value=self.useE))
             predicates.append(ProblemPredicate("StridedBatched", value=self.stridedBatched))
-            predicates.append(ProblemPredicate("GroupedGemm", value=self.groupedGemm))
+            predicates.append(ProblemPredicate("GroupedGemm", value=int(self.groupedGemm)))
             predicates.append(ProblemPredicate("UseScaleAB", value=self.useScaleAB))
             predicates.append(ProblemPredicate("UseScaleCD", value=self.useScaleCD))
             predicates.append(ProblemPredicate("UseScaleAlphaVec", value=self.useScaleAlphaVec))
@@ -625,6 +625,12 @@ class Solution:
 
         rv.problemType = ProblemType.FromOriginalState(d['ProblemType'])
 
+        rv.internalArgsSupport = InternalArgsSupport.FromOriginalState(d)
+        #print('internalArgsSupport', rv.internalArgsSupport)
+        #print('internalArgsSupport.useUniversalArgs', rv.internalArgsSupport.useUniversalArgs)
+        if rv.internalArgsSupport.useUniversalArgs == True:
+            rv.problemType.groupedGemm = 2
+        
         rv.problemPredicate = ProblemPredicate.FromOriginalState(d, rv.problemType)
 
         if 'DebugKernel' in d:
@@ -637,8 +643,6 @@ class Solution:
         rv.libraryLogicIndex = int(info.get("SolutionIndex", -1))
 
         rv.sizeMapping = SizeMapping.FromOriginalState(d)
-
-        rv.internalArgsSupport = InternalArgsSupport.FromOriginalState(d)
 
         if 'Ideals' in d:
             rv.ideals = d['Ideals']

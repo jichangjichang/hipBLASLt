@@ -480,7 +480,7 @@ namespace Tensile
             bool                  useInitialStridesCD       = false;
             bool                  stridedBatched            = true;
             bool                  outputAmaxD               = false;
-            bool                  groupedGemm               = false;
+            int                   groupedGemm               = 0;
             ActivationType        activationType            = ActivationType::None;
             int                   activationArgLength       = 0;
             bool                  activationNoGuard         = false;

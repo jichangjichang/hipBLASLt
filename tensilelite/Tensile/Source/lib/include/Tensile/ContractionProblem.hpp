@@ -793,7 +793,7 @@ namespace Tensile
             return m_stridedBatched;
         }
 
-        void setGroupedGemm(bool value)
+        void setGroupedGemm(int value)
         {
             m_groupedGemm = value;
         }
@@ -808,7 +808,7 @@ namespace Tensile
             return m_groupedGemmCount;
         }
 
-        bool groupedGemm() const
+        int groupedGemm() const
         {
             return m_groupedGemm;
         }
@@ -1109,7 +1109,7 @@ namespace Tensile
 
         bool           m_cEqualsD                = false;
         bool           m_stridedBatched          = true;
-        bool           m_groupedGemm             = false;
+        int           m_groupedGemm             = 0;
         int            m_groupedGemmCount        = std::numeric_limits<int>::max();
         bool           m_highPrecisionAccumulate = false;
         bool           m_deterministicMode       = false;

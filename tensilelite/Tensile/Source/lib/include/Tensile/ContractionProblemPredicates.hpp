@@ -1671,10 +1671,10 @@ namespace Tensile
                     HasIndex = false,
                     HasValue = true
                 };
-                bool value;
+                int value;
 
                 GroupedGemmEqual() = default;
-                GroupedGemmEqual(bool value)
+                GroupedGemmEqual(int value)
                     : value(value)
                 {
                 }
@@ -1686,14 +1686,17 @@ namespace Tensile
 
                 virtual bool operator()(ContractionProblemGemm const& problem) const override
                 {
-                    return problem.groupedGemm() == value;
+                    return problem.groupedGemm() == value || value == 2;
                 }
 
                 virtual bool debugEval(ContractionProblemGemm const& problem,
                                        std::ostream&                 stream) const override
                 {
-                    return debugEvalCmp(
-                        problem, stream, "prob", problem.groupedGemm(), "==", "sol", value);
+                    bool rv = (*this)(problem);
+
+                    stream << *this << ": prob: " << problem.groupedGemm()
+                           << ", Is sol support: " << value << std::endl;
+                    return rv;
                 }
             };
 

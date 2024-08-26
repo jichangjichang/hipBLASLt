@@ -524,10 +524,12 @@ class ProblemType(Mapping):
 
     # precision and other
     # name += "_SB" if self["StridedBatched"] else "_GB"
-    if self["GroupedGemm"]:
-      name += "_GG"
-    else:
-      name += "" if self["StridedBatched"] else "_GB" # legacy
+    #if self["GroupedGemm"] == 1:
+    #  name += "_GG"
+    #elif self["GroupedGemm"] == 2:
+    #  name += "_GG2"
+    #else:
+    name += "" if self["StridedBatched"] else "_GB" # legacy
 
     # Activation Naming
     if self["ActivationType"] != 'none':
@@ -1060,6 +1062,8 @@ class Solution(collections.abc.Mapping):
     else:
       self["InternalSupportParams"] = defaultInternalSupportParams
 
+    #if self["InternalSupportParams"]["UseUniversalArgs"] == True:
+    #  self["ProblemType"]["GroupedGemm"] = 2
 
     # assign parameters with defaults
     for key in defaultSolution:

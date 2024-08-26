@@ -399,10 +399,10 @@ class MasterSolutionLibrary:
                     placeholderName += '_Bias'
                 if problemType.useE:
                     placeholderName += '_Grad' if problemType.useGradient else '_Aux'
-                if problemType.groupedGemm:
-                    placeholderName += "_GG"
-                else:
-                    placeholderName += "" if problemType.stridedBatched else "_GB" # legacy
+                #if problemType.groupedGemm:
+                #    placeholderName += "_GG"
+                #else:
+                placeholderName += "" if problemType.stridedBatched else "_GB" # legacy
                 if problemType.useScaleAB == "Scalar":
                     placeholderName += '_SAB'
                 elif problemType.useScaleAB == "Vector":

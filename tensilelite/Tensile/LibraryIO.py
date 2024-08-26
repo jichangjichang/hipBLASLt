@@ -288,6 +288,8 @@ def parseLibraryLogicData(data, srcFile="?", archs=None):
                 solutionState[key] = value
         solutionObject = Solution(solutionState)
         if solutionObject["ProblemType"] != problemType:
+            print("solutionObject[\"ProblemType\"]", solutionObject["ProblemType"])
+            print("problemType", problemType)
             printExit(f"ProblemType in library logic file {srcFile} doesn't match solution: {problemType} != {solutionObject['ProblemType']}")
         return solutionObject
 
