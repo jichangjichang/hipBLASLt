@@ -107,9 +107,9 @@ def prepAsm(kernelWriterAssembly):
     assemblerFile.write("#!/bin/sh {log}\n".format(log = "-x" if globalParameters["PrintLevel"] >=2  else ""))
     assemblerFile.write("# usage: asm-new.sh kernelName(no extension) [--wave32]\n")
 
-    assemblerFile.write("f=$1\n")
-    assemblerFile.write("filename=${1##*/}\n")
-    assemblerFile.write("dirname=${1%/*}\n")
+    assemblerFile.write("f=./$1\n")
+    assemblerFile.write("filename=${f##*/}\n")
+    assemblerFile.write("dirname=${f%/*}\n")
     assemblerFile.write("shift\n")
     assemblerFile.write('if [ ! -z "$1" ] && [ "$1" = "--wave32" ]; then\n')
     assemblerFile.write("    wave=32\n")
